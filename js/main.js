@@ -30,16 +30,21 @@
   let toastT = 0;
   function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('in'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('in'), 2200); }
   // ---------- 毎フレーム ----------
+  const SLOW_N = Math.round(1.1 / DG.DT);   // 決着の1.1秒前からスロー
   let last = performance.now(), fpsT = 0, fpsN = 0, fpsChecked = 0;
   function loop(ts) {
     const dt = Math.min(0.05, Math.max(0, (ts - last) / 1000)); last = ts;
     if (st.m && st.run) {
-      st.acc += dt; let n = 0;
+      // 決着の少し前からスローにする（結果は先に計算してあるので、決まる瞬間がわかる）
+      const left = st.endStep ? st.endStep - st.m.step : 1e9;
+      const slow = !st.demo && left < SLOW_N;
+      st.acc += dt * (slow ? 0.3 : 1); let n = 0;
+      if (slow && !st.slowOn) { st.slowOn = true; document.body.classList.add('slow'); }
       while (st.acc >= DG.DT && n < 30 && !st.m.over) { st.m.tick(); st.acc -= DG.DT; n++; }
       if (n >= 30) st.acc = 0;
       pump();
     }
-    if (V && st.bg) V.frame(dt);
+    if (V && st.bg) V.frame(dt * (st.slowOn && st.run ? 0.3 : 1));
     if (st.scr === 'battle') hud();
     // 重い端末は軽い表示に
     if (is3 && st.scr === 'battle' && st.run && fpsChecked < 2) {
@@ -61,7 +66,8 @@
       st.run = false;
       if (st.demo) { setTimeout(() => { if (st.demo && st.scr === 'title') demo(); }, 1500); return; }
       S.humStop(); callout(m.endBy === 'time' ? '時間切れ！' : '決着！');
-      setTimeout(result, 1600);
+      setTimeout(() => document.body.classList.remove('slow'), 1200);
+      setTimeout(result, 2000);
     }
   }
   let coT = 0;
@@ -248,6 +254,9 @@
     $('mg').innerHTML = side(a, 0) + '<div class="mg-vs">VS</div>' + side(b, 1);
     const ps = [...$('mg').querySelectorAll('.mg-side')];
     mergeT.forEach(clearTimeout); mergeT = [];
+    // 同じ作りなら必ず同じ結果になるので、先に最後まで計算して決着の瞬間を知っておく
+    st.endStep = 0; st.slowOn = false; document.body.classList.remove('slow');
+    try { const pre = new DG.Match(da, db); pre.run(1e7); if (pre.endBy === 'break') st.endStep = pre.step; } catch (e) { }
     for (let i = 0; i < 3; i++) mergeT.push(setTimeout(() => { ps.forEach(p => p.children[i].classList.add('in')); S.clunk(i); }, 200 + i * 330));
     mergeT.push(setTimeout(() => { ps.forEach(p => p.querySelector('.mg-n').classList.add('in')); S.beep(false); }, 1250));
     mergeT.push(setTimeout(() => {
@@ -259,12 +268,12 @@
       $('hint3d').style.opacity = 1; setTimeout(() => { $('hint3d').style.opacity = 0; }, 3500);
     }, 2500));
   }
-  function stopMatch() { st.run = false; st.demo = false; mergeT.forEach(clearTimeout); mergeT = []; S.humStop(); }
+  function stopMatch() { document.body.classList.remove('slow'); st.endStep = 0; st.run = false; st.demo = false; mergeT.forEach(clearTimeout); mergeT = []; S.humStop(); }
   function hudInit() {
     const m = st.m;
     [m.A, m.B].forEach((o, k) => {
       const sp = k ? st.match.b : st.match.a;
-      $('h' + k).innerHTML = `<div class="nm">${esc(DG.nameOf(sp))}</div><div class="hp"><i></i><b></b></div><div class="ly">${o.layers.map((L, i) => `<span><i style="background:${DG.TIER_COL[i]}"></i><em>${DG.TIER[i][0]}</em></span>`).join('')}</div>`;
+      $('h' + k).innerHTML = `<div class="nm">${esc(DG.nameOf(sp))}</div><div class="hp"><u></u><i></i><span class="hpn">HP 100</span></div><div class="ly">${o.layers.map((L, i) => `<span><i style="background:${DG.TIER_COL[i]}"></i><em>${DG.TIER[i][0]}</em></span>`).join('')}</div>`;
     });
   }
   function hud() {
@@ -272,7 +281,13 @@
     $('clock').textContent = Math.max(0, Math.ceil(DG.TMAX - m.t));
     [m.A, m.B].forEach((o, k) => {
       const el = $('h' + k); if (!el.firstChild) return;
-      el.querySelector('.hp i').style.width = (o.ratio() * 100).toFixed(1) + '%';
+      // HP：残り35%で0になる（0で負け）。減るほど 緑→黄→赤、少ないと点滅
+      const hp = Math.max(0, Math.min(1, (o.ratio() - DG.LOSE) / (1 - DG.LOSE))), w = (hp * 100).toFixed(1) + '%';
+      const bar = el.querySelector('.hp i'), gh = el.querySelector('.hp u');
+      bar.style.width = w; gh.style.width = w;
+      bar.style.background = hp > 0.5 ? '#3e9a55' : hp > 0.25 ? '#e0a21b' : '#d8402f';
+      el.classList.toggle('pinch', hp > 0 && hp <= 0.15);
+      const t = 'HP ' + Math.ceil(hp * 100); const hn = el.querySelector('.hpn'); if (hn.textContent !== t) hn.textContent = t;
       const sp = el.querySelectorAll('.ly span');
       o.layers.forEach((L, i) => { const r = L.frags.reduce((x, f) => x + (f.alive ? f.a : 0), 0) / L.a0; sp[i].querySelector('i').style.width = (r * 100).toFixed(0) + '%'; sp[i].classList.toggle('burst', L.burst); });
     });

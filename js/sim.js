@@ -15,7 +15,7 @@
   const T_SEED = [12, 24, 16];          // 欠片の数のめやす
   const T_HP = [0.9, 1.0, 1.0];
   const R_CAP = [3.4, 3.0, 3.4];        // 軸からいちばん遠い所の上限（土俵の半径は 8.2）
-  const DMG = 0.005, SLIP = 0.12, DT = 1 / 180, TMAX = 60, LOSE = 0.35, R_ARENA = 8.2, HPA = 52;
+  const DMG = 0.003, SLIP = 0.12, DT = 1 / 180, TMAX = 60, LOSE = 0.35, R_ARENA = 8.2, HPA = 52;
   DG.DT = DT; DG.TMAX = TMAX; DG.LOSE = LOSE; DG.R_ARENA = R_ARENA;
   const rot = (x, y, c, s) => [c * x - s * y, s * x + c * y];
 
