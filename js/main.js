@@ -38,13 +38,14 @@
       // 決着の少し前からスローにする（結果は先に計算してあるので、決まる瞬間がわかる）
       const left = st.endStep ? st.endStep - st.m.step : 1e9;
       const slow = !st.demo && left < SLOW_N;
-      st.acc += dt * (slow ? 0.3 : 1); let n = 0;
+      const sp = st.demo ? 1 : st.speed, k = slow ? Math.min(sp, 0.3) : sp;
+      st.acc += dt * k; let n = 0;
       if (slow && !st.slowOn) { st.slowOn = true; document.body.classList.add('slow'); }
       while (st.acc >= DG.DT && n < 30 && !st.m.over) { st.m.tick(); st.acc -= DG.DT; n++; }
       if (n >= 30) st.acc = 0;
       pump();
     }
-    if (V && st.bg) V.frame(dt * (st.slowOn && st.run ? 0.3 : 1));
+    if (V && st.bg) V.frame(dt * (st.m && !st.demo && st.scr === 'battle' ? (st.slowOn && st.run ? Math.min(st.speed, 0.3) : st.speed) : 1));
     if (st.scr === 'battle') hud();
     // 重い端末は軽い表示に
     if (is3 && st.scr === 'battle' && st.run && fpsChecked < 2) {
@@ -336,6 +337,11 @@
       o.layers.forEach((L, i) => { const r = L.frags.reduce((x, f) => x + (f.alive ? f.a : 0), 0) / L.a0; sp[i].querySelector('i').style.width = (r * 100).toFixed(0) + '%'; sp[i].classList.toggle('burst', L.burst); });
     });
   }
+  // 試合の速さ（×1・×0.5・×0.25・×0.1）。結果は変わらない（計算の進み方を遅くするだけ）
+  st.speed = 1; try { const v = parseFloat(localStorage.getItem('dangan_spd')); if ([1, 0.5, 0.25, 0.1].includes(v)) st.speed = v; } catch (e) { }
+  const spdUI = () => document.querySelectorAll('#spd [data-s]').forEach(b => b.classList.toggle('on', +b.dataset.s === st.speed));
+  $('spd').addEventListener('click', ev => { const b = ev.target.closest('[data-s]'); if (!b) return; st.speed = +b.dataset.s; try { localStorage.setItem('dangan_spd', String(st.speed)); } catch (e) { } spdUI(); });
+  spdUI();
   $('c-auto').onclick = () => DG.V3.setMode('auto');
   $('c-top').onclick = () => DG.V3.setMode(DG.V3.mode() === 'top' ? 'auto' : 'top');
   $('c-dim').onclick = () => setView(!is3);
