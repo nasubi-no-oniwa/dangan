@@ -5,7 +5,7 @@
   const DG = window.DG, D = JM.D, S = DG.S;
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const st = { bg: true, scr: 'title', spec: null, cur: null, prev: null, tab: 1, vs: [null, null], vsLab: ['', ''], m: null, run: false, acc: 0, demo: false, trial: false, pickFor: -1, endAt: 0, rec: {} };
+  const st = { bg: true, mode: 'local', lmode: 'rec', sortK: 0, sortDir: -1, filt: 'all', scr: 'title', spec: null, cur: null, prev: null, tab: 1, vs: [null, null], vsLab: ['', ''], m: null, run: false, acc: 0, demo: false, trial: false, pickFor: -1, endAt: 0, rec: {} };
   DG.st = st;
   // ---------- 表示（3D／2D） ----------
   const low = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 3;
@@ -24,7 +24,7 @@
   // ---------- 画面 ----------
   function show(id) {
     st.scr = id; document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 's-' + id));
-    const bg = id === 'title' || id === 'battle' || id === 'merge' || id === 'result' || id === 'vs' || id === 'saved';
+    const bg = id !== 'build';
     st.bg = bg; $('arena3').style.visibility = $('arena2').style.visibility = bg ? 'visible' : 'hidden';
   }
   let toastT = 0;
@@ -66,6 +66,7 @@
       st.run = false;
       if (st.demo) { setTimeout(() => { if (st.demo && st.scr === 'title') demo(); }, 1500); return; }
       S.humStop(); callout(m.endBy === 'time' ? '時間切れ！' : '決着！');
+      if (st.onEnd) { try { st.onEnd(m); } catch (e) { } st.onEnd = null; }
       setTimeout(() => document.body.classList.remove('slow'), 1200);
       setTimeout(result, 2000);
     }
@@ -176,13 +177,48 @@
     for (let i = 0; i < 40 && L.length; i++) out.push(L.splice(Math.floor(Math.random() * L.length), 1)[0]);
     return (recCache[t] = out);
   }
-  function renderList() {
-    const q = $('b-q').value.trim(), cur = st.spec[st.tab][0];
-    const L = q ? D.search(q, 80) : rec(st.tab);
-    const head = q ? (L.length ? `${D.lastCount > L.length ? D.lastCount + '件中 ' + L.length + '件' : L.length + '件'}` : '見つかりません') : `${DG.TIER[st.tab]}向きの候補（さがすと24,838から選べる）<button class="btn sm" id="b-more" style="margin-left:6px">ほかの候補</button>`;
-    $('b-list').innerHTML = `<div class="b-lhead">${head}</div>` + L.map(e => { const h = DG.hint(e); return `<button class="it${e.id === cur ? ' on' : ''}" data-id="${esc(e.id)}"><span class="nm">${esc(e.n)}<small>${esc(e.pn || '')}${e.t ? ' ・' + esc(e.t.slice(0, 4)) + '年まで' : ''}</small></span><span class="tag h${h.t}">${h.txt}</span></button>`; }).join('');
+  // 並べかえ・しぼりこみ（元の数字：体力＝面積、勢い＝人口、かたさ＝まとまり、鋭さ＝トゲ、速さ＝人口密度）
+  const SORTK = [['0', '体力'], ['1', '勢い'], ['2', 'かたさ'], ['3', '鋭さ'], ['4', '速さ'], ['pop', '人口']];
+  const FILT = [['all', '全部'], ['now', '今ある'], ['old', 'なくなった'], ['jp', '日本'], ['world', '世界']];
+  const sortVal = e => st.sortK === 'pop' ? (e.pop || 0) : e.st[+st.sortK];
+  const passF = e => st.filt === 'all' || (st.filt === 'now' ? !e.t : st.filt === 'old' ? !!e.t : st.filt === 'jp' ? e.p <= 47 : e.p >= 48);
+  function sorted(L) { const d = st.sortDir; return L.filter(passF).sort((a, b) => (sortVal(a) - sortVal(b)) * d || a.i - b.i); }
+  const fmtPop = v => v >= 1e8 ? (v / 1e8).toFixed(1) + '億' : v >= 1e4 ? Math.round(v / 1e4) + '万' : String(v);
+  let popReq = 0;
+  async function renderList() {
+    const q = $('b-q').value.trim(), cur = st.spec[st.tab][0], mode = st.lmode;
+    $('b-modes').querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+    $('b-sort').classList.toggle('hide', mode !== 'sort');
+    let L, head, cnt = null;
+    if (mode === 'sort') {
+      const all = q ? D.search(q, 30000) : D.list; L = sorted(all); const n = L.length; L = L.slice(0, 80);
+      head = `${q ? '「' + esc(q) + '」' : '全体'}を${SORTK.find(k => k[0] === String(st.sortK))[1]}の${st.sortDir < 0 ? '多い' : '少ない'}順（${n.toLocaleString()}件${n > 80 ? 'の上から80件' : ''}）`;
+    } else if (q) {
+      L = D.search(q, 80); head = L.length ? `${D.lastCount > L.length ? D.lastCount + '件中 ' + L.length + '件' : L.length + '件'}` : '見つかりません';
+    } else if (mode === 'pop') {
+      const tok = ++popReq; $('b-list').innerHTML = '<div class="b-lhead">読みこみ中…</div>';
+      let P; try { P = await DG.Chal.popular(); } catch (e) { P = null; }
+      if (tok !== popReq || st.lmode !== 'pop' || $('b-q').value.trim()) return;
+      if (!P || !P.n) { $('b-list').innerHTML = '<div class="b-lhead">まだ挑戦状が少なくて、人気がわかりません。</div>'; return; }
+      const row = P.tier[st.tab].length ? P.tier[st.tab] : P.all; cnt = new Map(row);
+      L = row.map(([id]) => D.byId.get(id)).filter(Boolean);
+      head = `新しい挑戦状${P.n}枚で、${DG.TIER[st.tab]}によく使われている`;
+    } else {
+      L = rec(st.tab); head = `${DG.TIER[st.tab]}向きの候補（さがすと24,838から選べる）<button class="btn sm" id="b-more" style="margin-left:6px">ほかの候補</button>`;
+    }
+    $('b-list').innerHTML = `<div class="b-lhead">${head}</div>` + L.map(e => {
+      const h = DG.hint(e);
+      const side = mode === 'sort' ? `<span class="val">${SORTK.find(k => k[0] === String(st.sortK))[1]} ${st.sortK === 'pop' ? fmtPop(e.pop || 0) : e.st[+st.sortK]}</span>` : cnt ? `<span class="val">${cnt.get(e.id)}回</span>` : '';
+      return `<button class="it${e.id === cur ? ' on' : ''}" data-id="${esc(e.id)}"><span class="nm">${esc(e.n)}<small>${esc(e.pn || '')}${e.t ? ' ・' + esc(e.t.slice(0, 4)) + '年まで' : ''}</small></span>${side}<span class="tag h${h.t}">${h.txt}</span></button>`;
+    }).join('');
     const mb = $('b-more'); if (mb) mb.onclick = () => { delete recCache[st.tab]; renderList(); };
   }
+  $('b-sk').innerHTML = SORTK.map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+  $('b-fl').innerHTML = FILT.map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+  $('b-modes').addEventListener('click', ev => { const b = ev.target.closest('[data-m]'); if (!b) return; st.lmode = b.dataset.m; renderList(); });
+  $('b-sk').onchange = () => { st.sortK = $('b-sk').value; renderList(); };
+  $('b-fl').onchange = () => { st.filt = $('b-fl').value; renderList(); };
+  $('b-dir').onclick = () => { st.sortDir = -st.sortDir; $('b-dir').textContent = st.sortDir < 0 ? '多い順' : '少ない順'; renderList(); };
   let qT = 0; $('b-q').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(renderList, 160); });
   $('b-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.target.blur(); renderList(); } });
   $('b-list').addEventListener('click', ev => {
@@ -197,7 +233,10 @@
   $('b-try').onclick = async () => { const opp = await DG.fix(DG.random()); st.trial = true; startMatch(st.spec.map(s => s.slice()), opp); };
   // ---------- 対戦の相手えらび ----------
   async function preview(cv, spec) {
-    const [w, h] = fitCanvas(cv), g = cv.getContext('2d'); g.clearRect(0, 0, w, h);
+    // まだ画面に出ていないキャンバスは、指定の大きさ（なければ76px）で描く
+    const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1), css = r.width || parseFloat(cv.style.width) || 76;
+    const w = Math.round(css * d), h = w; cv.width = w; cv.height = h;
+    const g = cv.getContext('2d'); g.clearRect(0, 0, w, h);
     try { await DG.fix(spec); const t = new DG.Top(await DG.def(spec), 0); const k = Math.min(w, h) / 2 / (t.reach * 1.08); DG.drawTop(g, t, w / 2, h / 2, k, { tierCol: true }); } catch (e) { }
   }
   function partsTxt(spec) { return spec.map((s, i) => DG.TIER[i][0] + '：' + esc(D.byId.get(s[0]).n)).join('　'); }
@@ -206,8 +245,9 @@
     if (!st.vs[1]) { st.vs[1] = DG.random(); st.vsLab[1] = 'おまかせ'; }
     for (const k of [0, 1]) {
       const el = $('v-s' + k), sp = st.vs[k];
+      const lock = k === 1 && (st.chal || st.tmp);
       el.innerHTML = `<span class="v-side">${k ? '青' : '赤'}${st.vsLab[k] ? '・' + esc(st.vsLab[k]) : ''}</span>` + (sp ? `<canvas class="v-cv"></canvas><div class="v-info"><div class="v-name">${esc(DG.nameOf(sp))}</div><div class="v-parts">${partsTxt(sp)}</div></div>` : '<div class="v-info"><div class="v-name">まだない</div></div>') +
-        `<div class="v-btns"><button class="btn sm" data-a="saved">保存から</button><button class="btn sm" data-a="rand">おまかせ</button>${k === 0 ? '<button class="btn sm" data-a="build">作る</button>' : ''}</div>`;
+        (lock ? '' : `<div class="v-btns"><button class="btn sm" data-a="saved">保存から</button><button class="btn sm" data-a="rand">おまかせ</button>${k === 0 ? '<button class="btn sm" data-a="build">作る</button>' : ''}</div>`);
       if (sp) preview(el.querySelector('canvas'), sp);
       el.onclick = ev => {
         const b = ev.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
@@ -217,6 +257,7 @@
       };
     }
     $('v-go').disabled = !(st.vs[0] && st.vs[1]);
+    $('v-title').textContent = st.chal ? '挑戦状と戦う' : st.tmp ? '仕返し' : '対戦';
   }
   $('v-back').onclick = () => toTitle();
   $('v-go').onclick = () => { if (st.vs[0] && st.vs[1]) { st.trial = false; startMatch(st.vs[0], st.vs[1]); } };
@@ -225,7 +266,7 @@
     st.pickFor = pickFor; stopMatch(); show('saved');
     $('sv-title').textContent = pickFor >= 0 ? (pickFor ? '青' : '赤') + 'のコマをえらぶ' : '保存したコマ';
     const L = DG.saved().map(x => ({ x, sp: DG.decode(x.code) })).filter(y => y.sp);
-    $('sv-list').innerHTML = L.length ? L.map(({ x, sp }, i) => `<div class="sv" data-i="${i}"><canvas></canvas><div class="sv-i"><div class="v-name">${esc(DG.nameOf(sp))}</div><div class="v-parts">${partsTxt(sp)}</div><div class="v-btns">${pickFor >= 0 ? '<button class="btn sm hot" data-a="use">これにする</button>' : '<button class="btn sm hot" data-a="vs">戦う</button><button class="btn sm" data-a="edit">作り直す</button>'}<button class="btn sm" data-a="send">送る</button><button class="btn sm" data-a="del">消す</button></div></div></div>`).join('') : '<div class="sv-empty">まだ保存したコマはありません。<br>「コマを作る」で作って「保存」をおしてください。</div>';
+    $('sv-list').innerHTML = L.length ? L.map(({ x, sp }, i) => `<div class="sv" data-i="${i}"><canvas></canvas><div class="sv-i"><div class="v-name">${esc(DG.nameOf(sp))}</div><div class="v-parts">${partsTxt(sp)}</div><div class="v-btns">${pickFor >= 0 ? '<button class="btn sm hot" data-a="use">これにする</button>' : '<button class="btn sm hot" data-a="vs">戦う</button><button class="btn sm" data-a="edit">作り直す</button>'}<button class="btn sm" data-a="send">送る</button>${pickFor >= 0 ? '' : '<button class="btn sm" data-a="chal">挑戦状にする</button>'}<button class="btn sm" data-a="del">消す</button></div></div></div>`).join('') : '<div class="sv-empty">まだ保存したコマはありません。<br>「コマを作る」で作って「保存」をおしてください。</div>';
     $('sv-list').querySelectorAll('.sv').forEach(el => preview(el.querySelector('canvas'), L[+el.dataset.i].sp));
     $('sv-list').onclick = ev => {
       const b = ev.target.closest('[data-a]'); if (!b) return; const it = L[+b.closest('.sv').dataset.i], a = b.dataset.a;
@@ -233,6 +274,7 @@
       else if (a === 'vs') { st.vs[0] = it.sp; st.vsLab[0] = '保存'; openVs(); }
       else if (a === 'edit') openBuild(it.sp);
       else if (a === 'send') send(it.sp);
+      else if (a === 'chal') DG.Chal.put([{ sp: it.sp, lab: 'このコマ' }]);
       else if (a === 'del') { DG.unsave(it.x.code); openSaved(pickFor); toast('消しました'); }
     };
   }
@@ -244,20 +286,22 @@
   }
   // ---------- 合体 → 試合 ----------
   let mergeT = [];
-  async function startMatch(a, b) {
+  async function startMatch(a, b, opt) {
+    opt = opt || {};
     stopMatch(); S.unlock();
+    st.net = !!opt.net; st.who = opt.who || null; st.onEnd = opt.onEnd || null;
     await DG.fix(a); await DG.fix(b);
     let da, db; try { [da, db] = [await DG.def(a), await DG.def(b)]; } catch (e) { toast('形を読みこめませんでした'); return; }
     st.match = { a, b };
     show('merge');
-    const side = (sp, k) => `<div class="mg-side s${k}">${sp.map((s, i) => `<div class="mg-p" style="background:${DG.TIER_COL[i]}">${DG.TIER[i]}　${esc(D.byId.get(s[0]).n)}</div>`).join('')}<div class="mg-n">${esc(DG.nameOf(sp))}</div></div>`;
+    const side = (sp, k) => `<div class="mg-side s${k}">${st.who ? `<div class="mg-who">${esc(st.who[k])}</div>` : ''}${sp.map((s, i) => `<div class="mg-p" style="background:${DG.tierCol(i, k)}">${DG.TIER[i]}　${esc(D.byId.get(s[0]).n)}</div>`).join('')}<div class="mg-n">${esc(DG.nameOf(sp))}</div></div>`;
     $('mg').innerHTML = side(a, 0) + '<div class="mg-vs">VS</div>' + side(b, 1);
     const ps = [...$('mg').querySelectorAll('.mg-side')];
     mergeT.forEach(clearTimeout); mergeT = [];
     // 同じ作りなら必ず同じ結果になるので、先に最後まで計算して決着の瞬間を知っておく
     st.endStep = 0; st.slowOn = false; document.body.classList.remove('slow');
     try { const pre = new DG.Match(da, db); pre.run(1e7); if (pre.endBy === 'break') st.endStep = pre.step; } catch (e) { }
-    for (let i = 0; i < 3; i++) mergeT.push(setTimeout(() => { ps.forEach(p => p.children[i].classList.add('in')); S.clunk(i); }, 200 + i * 330));
+    for (let i = 0; i < 3; i++) mergeT.push(setTimeout(() => { ps.forEach(p => p.querySelectorAll('.mg-p')[i].classList.add('in')); S.clunk(i); }, 200 + i * 330));
     mergeT.push(setTimeout(() => { ps.forEach(p => p.querySelector('.mg-n').classList.add('in')); S.beep(false); }, 1250));
     mergeT.push(setTimeout(() => {
       st.m = new DG.Match(da, db); st.demo = false; st.acc = 0; V.setMatch(st.m);
@@ -273,7 +317,7 @@
     const m = st.m;
     [m.A, m.B].forEach((o, k) => {
       const sp = k ? st.match.b : st.match.a;
-      $('h' + k).innerHTML = `<div class="nm">${esc(DG.nameOf(sp))}</div><div class="hp"><u></u><i></i><span class="hpn">HP 100</span></div><div class="ly">${o.layers.map((L, i) => `<span><i style="background:${DG.TIER_COL[i]}"></i><em>${DG.TIER[i][0]}</em></span>`).join('')}</div>`;
+      $('h' + k).innerHTML = `<div class="nm">${st.who ? '<small>' + esc(st.who[k]) + '</small> ' : ''}${esc(DG.nameOf(sp))}</div><div class="hp"><u></u><i></i><span class="hpn">HP 100</span></div><div class="ly">${o.layers.map((L, i) => `<span><i style="background:${DG.tierCol(i, k)}"></i><em>${DG.TIER[i][0]}</em></span>`).join('')}</div>`;
     });
   }
   function hud() {
@@ -295,7 +339,7 @@
   $('c-auto').onclick = () => DG.V3.setMode('auto');
   $('c-top').onclick = () => DG.V3.setMode(DG.V3.mode() === 'top' ? 'auto' : 'top');
   $('c-dim').onclick = () => setView(!is3);
-  $('c-quit').onclick = () => { stopMatch(); st.trial ? openBuild(st.spec) : openVs(); };
+  $('c-quit').onclick = () => { stopMatch(); if (st.mode !== 'local') { DG.Net.leave(); toTitle(); } else st.trial ? openBuild(st.spec) : openVs(); };
   // ---------- 結果 ----------
   function result() {
     const m = st.m; if (!m) return; show('result'); S.win();
@@ -315,21 +359,44 @@
     const why = w < 0 ? (m.mirror ? '同じコマどうしは引き分け' : '残りが同じ') : m.endBy === 'time' ? '60秒たって、残りが多かった' : '相手を65%削った';
     $('res').innerHTML = `<h2>${w < 0 ? '引き分け' : `<span class="wn w${w}">${esc(nm[w])}</span>の勝ち！`}</h2><div class="why">${why}（${m.t.toFixed(1)}秒）</div>
       <table><tr><th></th><th class="c0">${esc(nm[0])}</th><th class="c1">${esc(nm[1])}</th></tr>${rows.map(([lab, f]) => `<tr><td>${lab}</td><td>${f(O[0], O[1])}</td><td>${f(O[1], O[0])}</td></tr>`).join('')}</table>
-      <div class="row">${st.trial ? '<button class="btn hot" data-a="back">作る画面にもどる</button><button class="btn" data-a="again">別の相手と試す</button>' : '<button class="btn hot" data-a="rebuild">作り直す</button><button class="btn" data-a="opp">相手を変える</button><button class="btn" data-a="save">赤を保存</button>'}<button class="btn" data-a="title">タイトル</button></div>`;
+      <p class="res-note" id="res-note">${esc(st.netNote || '')}</p>
+      <div class="row">${btns()}</div>`;
+    function btns() {
+      if (st.mode === 'watch') return '<button class="btn hot" data-a="leave">部屋を出る</button>';
+      if (st.mode === 'net') return '<button class="btn hot" data-a="netagain">もう一戦</button><button class="btn" data-a="leave">部屋を出る</button>';
+      if (st.trial) return '<button class="btn hot" data-a="back">作る画面にもどる</button><button class="btn" data-a="again">別の相手と試す</button><button class="btn" data-a="title">タイトル</button>';
+      if (st.chal) return '<button class="btn hot" data-a="rebuild">作り直して再挑戦</button><button class="btn" data-a="nextchal">別の挑戦状</button><button class="btn" data-a="title">タイトル</button>';
+      return '<button class="btn hot" data-a="rebuild">作り直す</button><button class="btn" data-a="opp">相手を変える</button><button class="btn" data-a="save">赤を保存</button>' + (st.tmp ? '' : '<button class="btn" data-a="putchal">挑戦状を置く</button>') + '<button class="btn" data-a="title">タイトル</button>';
+    }
+    QM.syncNext();
+    if (st.chal && st.mode === 'local') DG.Chal.onResult(w, sp[0]).then(t => { if (t && st.scr === 'result') $('res-note').textContent = t; });
     $('res').onclick = async ev => {
       const b = ev.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
       if (a === 'back') openBuild(st.spec);
       else if (a === 'again') { const opp = await DG.fix(DG.random()); startMatch(st.spec.map(s => s.slice()), opp); }
       else if (a === 'rebuild') openBuild(st.match.a);
-      else if (a === 'opp') { st.vs[1] = DG.random(); st.vsLab[1] = 'おまかせ'; openVs(); }
+      else if (a === 'opp') { st.vs[1] = DG.random(); st.vsLab[1] = 'おまかせ'; st.tmp = false; openVs(); }
       else if (a === 'save') { DG.save({ name: nm[0], code: DG.encode(sp[0]) }); toast('保存しました（この端末）'); }
+      else if (a === 'putchal') DG.Chal.put([{ sp: sp[0], lab: '赤' }, { sp: sp[1], lab: '青' }]);
+      else if (a === 'nextchal') DG.Chal.open();
+      else if (a === 'netagain') { DG.Net.again(); b.disabled = true; b.textContent = 'あいてを待っています…'; }
+      else if (a === 'leave') { DG.Net.leave(); toTitle(); }
       else if (a === 'title') toTitle();
     };
   }
+  DG.netNote = () => { const e = $('res-note'); if (e && st.scr === 'result' && st.mode !== 'local') e.textContent = st.netNote || ''; };
   // ---------- タイトル ----------
-  function toTitle() { stopMatch(); show('title'); demo(); }
+  function toTitle() {
+    stopMatch(); if (DG.Net && DG.Net.active()) DG.Net.leave(); QM.ended();
+    st.mode = 'local'; st.chal = null; st.tmp = false; st.net = false; st.who = null; QM.close();
+    show('title'); demo(); if (DG.Chal) DG.Chal.mineSummary();
+  }
+  // ほかのファイルから使う
+  const curSpec = () => { try { return DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { return null; } };
+  Object.assign(DG, { show, toast, stopMatch, startMatch, toTitle, openVs, openBuild, preview, partsTxt, esc, curSpec });
   $('btn-build').onclick = () => { S.unlock(); openBuild(); };
-  $('btn-vs').onclick = () => { S.unlock(); if (!st.vs[0]) { let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? '作ったコマ' : 'おまかせ'; } openVs(); };
+  $('btn-online').onclick = () => { S.unlock(); DG.Net.open(); };
+  $('btn-vs').onclick = () => { S.unlock(); st.chal = null; st.tmp = false; if (!st.vs[0]) { let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? '作ったコマ' : 'おまかせ'; } openVs(); };
   $('btn-saved').onclick = () => openSaved(-1);
   $('btn-howto').onclick = () => $('m-howto').classList.remove('hide');
   $('m-howto').addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target.id === 'm-howto') $('m-howto').classList.add('hide'); });
@@ -341,8 +408,20 @@
   setView(true);
   requestAnimationFrame(loop);
   document.querySelectorAll('#s-title .btn').forEach(b => b.disabled = true);
+  QM.setup({
+    game: 'dangan', ver: 'v1', name: '弾丸合併',
+    getDb: () => DG.getDb(), anchor: '#btn-online', anchorWhere: 'before', btnClass: 'btn big hot', nextClass: 'btn', nameKey: 'dangan_name',
+    prep: () => { stopMatch(); },
+    join: (code, name) => { S.unlock(); DG.Net.join(name, code); },
+    cpu: () => DG.Chal.open(true), cpuLabel: '挑戦状と戦いながら待つ',
+    quit: () => { if (DG.Net) DG.Net.leave(); toTitle(); },
+    colors: { main: 'var(--red)', alt: 'var(--blue)', bg: '#f6eedb', fg: '#2a211b' },
+  });
+  QM.resultSlot('#res-qm', null);
   D.load().then(async () => {
     $('loading').textContent = '';
+    DG.Chal.mineSummary(true);
+    if (await DG.Chal.fromLink()) return;
     document.querySelectorAll('#s-title .btn').forEach(b => b.disabled = false);
     const q = new URLSearchParams(location.search), t = q.get('t');
     if (t) { const sp = DG.decode(t); if (sp) { st.vs[1] = sp; st.vsLab[1] = 'もらったコマ'; let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? '作ったコマ' : 'おまかせ'; history.replaceState(null, '', location.pathname); openVs(); toast('もらったコマと戦えます'); return; } }

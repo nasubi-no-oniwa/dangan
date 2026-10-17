@@ -6,8 +6,9 @@
   const V2 = DG.V2 = {};
   const TEAM = ['#d8402f', '#3f6fc9'], TEAM_D = ['#8e1d14', '#16357a'];
   // 上・中・下の色（はみ出しの色。3D の紙の色とそろえる）
-  DG.TIER_COL = ['#f0a542', '#f3ead6', '#5fb3a1'];
-  DG.TIER_FACE = ['#f2c27a', '#f6eedc', '#a9d3c0'];
+  // 段ごとの色：上段 オレンジ、中段 チームの色、下段 緑
+  DG.tierCol = (t, side) => [ '#f3a645', side ? '#5f8fe6' : '#ec6a52', '#52b48a'][t];
+  DG.TIER_COL = [0, 1, 2].map(t => DG.tierCol(t, 0));
   let cv, g, W = 1, H = 1, dpr = 1, sparks = [], shake = 0;
   V2.init = function (canvas) { cv = canvas; g = cv.getContext('2d'); return !!g; };
   V2.resize = function (w, h) { if (!cv) return; dpr = Math.min(2, window.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); };
@@ -26,7 +27,7 @@
       for (const f of L.frags) {
         if (!f.alive) continue;
         poly(c, f.poly, ox, oy, o.c, o.s, k);
-        c.fillStyle = opt.tierCol ? DG.TIER_COL[t] : DG.TIER_FACE[t]; c.fill();
+        c.fillStyle = DG.tierCol(t, opt.tierCol ? 0 : o.side); c.fill();
         c.lineWidth = Math.max(0.6, k * 0.02); c.strokeStyle = opt.tierCol ? 'rgba(42,31,23,.35)' : TEAM_D[o.side]; c.stroke();
       }
       // 段のふち（チームの色）
@@ -52,7 +53,7 @@
     for (const d of m.debris) {
       const a = Math.max(0, 1 - d.t / 2.5); g.globalAlpha = a;
       poly(g, d.f.poly.map((v, i) => v - (i % 2 ? d.f.cy : d.f.cx)), ox + d.x * k, oy + d.y * k, Math.cos(d.a), Math.sin(d.a), k);
-      g.fillStyle = DG.TIER_FACE[d.f.layer]; g.fill(); g.strokeStyle = TEAM[d.side]; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = DG.tierCol(d.f.layer, d.side); g.fill(); g.strokeStyle = TEAM[d.side]; g.lineWidth = 1.5; g.stroke();
     }
     g.globalAlpha = 1;
     for (const o of [m.A, m.B]) {

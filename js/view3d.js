@@ -10,7 +10,10 @@
   const H_BASE = 0.3, TH = 0.3, GAP = 0.13;           // 下段の底の高さ・段の厚さ・すき間
   const LAYER_Y = [H_BASE + 2 * (TH + GAP), H_BASE + (TH + GAP), H_BASE];   // 上・中・下
   const TEAM = [0xd8402f, 0x3f6fc9], TEAM_D = [0x8e1d14, 0x16357a];
-  const FACE = [0xf2c27a, 0xf6eedc, 0xa9d3c0];          // 上・中・下の紙の色（作る画面のはみ出し色とそろえる）
+  // 段ごとの色：上段 オレンジ、中段 チームの色（赤・青）、下段 緑（作る画面・2D とそろえる）
+  const FACE = s => [0xf3a645, s ? 0x5f8fe6 : 0xec6a52, 0x52b48a];
+  const EDGE = s => [s ? 0x2c4f9e : 0xb8761c, TEAM[s], s ? 0x1f7a6a : 0x2f8a5f];
+  const SCAR = 0xffe08a;   // 削れた断面（金色っぽく光る）
   let T, R, scene, cam, ctl, env, arena, root, ok = false, W = 1, Hh = 1;
   let tops = [], flying = [], sparks = [], mode = 'auto', shake = 0, autoA = 0.6, camT = null;
   V3.ok = () => ok;
@@ -91,6 +94,8 @@
     camT = null; V3.onMode && V3.onMode(mode);
   };
   V3.mode = () => mode;
+  // 決まった位置から写す（宣伝の画像づくり用）
+  V3.setCam = function (p, t) { if (!ok) return; mode = 'fixed'; cam.position.set(p[0], p[1], p[2]); cam.up.set(0, 1, 0); cam.lookAt(t[0], t[1], t[2]); if (ctl) { ctl.target.set(t[0], t[1], t[2]); ctl.enabled = false; } };
   // 重いときに軽くする（影なし・解像度を下げる）
   V3.degrade = function () { if (!ok) return; V3.low = true; R.setPixelRatio(1); R.shadowMap.enabled = false; scene.traverse(x => { if (x.material) x.material.needsUpdate = true; }); R.setSize(W, Hh, false); };
   // ---------- コマの立体 ----------
@@ -104,9 +109,15 @@
   const matCache = {};
   function mats(side, tier) {
     const k = side + '_' + tier; if (matCache[k]) return matCache[k];
-    const face = new T.MeshStandardMaterial({ map: paperTex(FACE[tier]), roughness: 0.75, metalness: 0.05, envMapIntensity: 0.45 });
-    const edge = new T.MeshStandardMaterial({ color: TEAM[side], metalness: 0.92, roughness: tier === 1 ? 0.22 : 0.3, envMapIntensity: 1.3 });
+    const face = new T.MeshStandardMaterial({ map: paperTex(FACE(side)[tier]), roughness: 0.7, metalness: 0.05, envMapIntensity: 0.45 });
+    const edge = new T.MeshStandardMaterial({ color: EDGE(side)[tier], metalness: 0.9, roughness: tier === 1 ? 0.2 : 0.28, envMapIntensity: 1.3 });
     return (matCache[k] = [face, edge]);
+  }
+  // 削れた所のとなり：側面を金色に光らせる
+  function scarMats(side, tier) {
+    const k = 's' + side + '_' + tier; if (matCache[k]) return matCache[k];
+    const scar = new T.MeshStandardMaterial({ color: SCAR, emissive: 0xffb02e, emissiveIntensity: 0.55, metalness: 0.6, roughness: 0.35 });
+    return (matCache[k] = [mats(side, tier)[0], scar]);
   }
   const lineMat = () => V3._lm || (V3._lm = new T.LineBasicMaterial({ color: 0x3a2a1a, transparent: true, opacity: 0.55 }));
   function buildTop(o) {
@@ -127,10 +138,18 @@
     const top = LAYER_Y[0] + TH + 0.32;
     const shaft = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, top - 0.1, 16), metal); shaft.position.y = (top + 0.1) / 2; shaft.castShadow = true; spin.add(shaft);
     const tip = new T.Mesh(new T.ConeGeometry(0.16, 0.26, 16), metal); tip.rotation.x = Math.PI; tip.position.y = 0.13; spin.add(tip);
-    const cap = new T.Mesh(new T.SphereGeometry(0.2, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshStandardMaterial({ color: TEAM[o.side], metalness: 0.9, roughness: 0.2 }));
+    const capM = new T.MeshStandardMaterial({ color: TEAM[o.side], emissive: TEAM[o.side], emissiveIntensity: 0.6, metalness: 0.7, roughness: 0.25 });
+    const cap = new T.Mesh(new T.SphereGeometry(0.2, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), capM);
     cap.position.y = top; spin.add(cap);
+    // 回転の残像：段ごとの色のうすい輪（回っている向きに関係なく、tilt の中に置く）
+    const rings = o.layers.map(L => {
+      let r = 0; for (const f of L.frags) r = Math.max(r, Math.hypot(f.cx, f.cy) + f.r);
+      const rm = new T.Mesh(new T.RingGeometry(r * 0.8, r, 56, 1), new T.MeshBasicMaterial({ color: FACE(o.side)[L.tier], transparent: true, opacity: 0.2, depthWrite: false, side: T.DoubleSide }));
+      rm.rotation.x = -Math.PI / 2; rm.position.y = LAYER_Y[L.tier] + TH + 0.015; rm.userData.r0 = r; tilt.add(rm);
+      return { L, m: rm };
+    });
     root.add(g);
-    return { o, g, tilt, spin, meshes, kick: 0, kx: 0, kz: 0 };
+    return { o, g, tilt, spin, meshes, rings, capM, kick: 0, kx: 0, kz: 0 };
   }
   V3.clear = function () {
     if (!ok) return;
@@ -141,18 +160,21 @@
   };
   V3.setMatch = function (m) { if (!ok) return; V3.clear(); tops = [buildTop(m.A), buildTop(m.B)]; V3.m = m; autoA = 0.6; };
   // ---------- 火花 ----------
-  function spark(x, y, v, big) {
+  function spark(x, y, v, big, col) {
     const n = big ? 60 : 24, pos = new Float32Array(n * 3), vel = [];
     let s = (x * 1000 + y * 7) | 0; const r = () => (s = (s * 16807 + 11) % 2147483647) / 2147483647;
     for (let i = 0; i < n; i++) { pos[i * 3] = x; pos[i * 3 + 1] = LAYER_Y[1] + 0.1; pos[i * 3 + 2] = y; const a = r() * 6.283, sp = (2 + r() * 5) * Math.min(2, 0.5 + v / 12); vel.push(Math.cos(a) * sp, 1 + r() * 4, Math.sin(a) * sp); }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3));
-    const p = new T.Points(geo, new T.PointsMaterial({ color: big ? 0xffffff : 0xffd65a, size: big ? 0.16 : 0.11, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending }));
+    const p = new T.Points(geo, new T.PointsMaterial({ color: big ? 0xffffff : (col != null ? col : 0xffd65a), size: big ? 0.16 : 0.11, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending }));
     root.add(p); sparks.push({ p, vel, t: 0, life: big ? 0.9 : 0.5 });
   }
   V3.event = function (ev) {
     if (!ok) return;
     if (ev.k === 'hit') {
+      // 火花：当たった段の色と、金色の火花
+      const la = ev.lay || [1, 1];
       spark(ev.x, ev.y, ev.v, ev.burst.length > 0);
+      if (!V3.low) { spark(ev.x, ev.y, ev.v * 0.8, false, FACE(0)[la[0]]); spark(ev.x, ev.y, ev.v * 0.8, false, FACE(1)[la[1]]); }
       shake = Math.max(shake, Math.min(0.35, ev.v / 60 + (ev.burst.length ? 0.4 : 0)));
       for (const t of tops) { const dx = t.o.x - ev.x, dy = t.o.y - ev.y, l = Math.hypot(dx, dy) || 1; t.kick = Math.min(0.5, t.kick + ev.v / 70); t.kx = dx / l; t.kz = dy / l; }
     }
@@ -172,10 +194,23 @@
       t.kick *= Math.pow(0.02, dt);
       const tx = wx / wl * wa + t.kx * t.kick, tz = wy / wl * wa + t.kz * t.kick;
       t.tilt.rotation.set(tz, 0, -tx);
+      // 残像の輪：削れて小さくなった段は輪も小さく。速く動くほど濃い
+      const sp = Math.hypot(o.vx, o.vy);
+      for (const R of t.rings) {
+        if (R.L.burst) { R.m.visible = false; continue; }
+        let r = 0, n = 0; for (const f of R.L.frags) if (f.alive) { r = Math.max(r, Math.hypot(f.cx, f.cy) + f.r); n++; }
+        if (!n) { R.m.visible = false; continue; }
+        const k = r / R.m.userData.r0; R.m.scale.set(k, k, 1);
+        R.m.material.opacity = 0.16 + Math.min(0.14, sp * 0.015) + 0.04 * Math.sin(o.th * 3);
+      }
+      t.capM.emissiveIntensity = 0.45 + 0.35 * (0.5 + 0.5 * Math.sin(o.th * 2));
       // 割れた欠片を飛ばす
       for (const [f, mesh] of t.meshes) {
         if (f.alive || !mesh.parent || mesh.userData.gone) continue;
         mesh.userData.gone = true;
+        // となりの残っている欠片は、削れた断面が見えるよう側面を金色に
+        const L = o.layers[f.layer];
+        for (const n of f.nb) { const g = L.frags[n]; if (g && g.alive) { const mm = t.meshes.get(g); if (mm && !mm.userData.scar) { mm.userData.scar = true; mm.material = scarMats(o.side, f.layer); } } }
         mesh.updateWorldMatrix(true, false);
         const wp = new T.Vector3(), wq = new T.Quaternion(), ws = new T.Vector3(); mesh.matrixWorld.decompose(wp, wq, ws);
         mesh.parent.remove(mesh); mesh.position.copy(wp); mesh.quaternion.copy(wq); root.add(mesh);
@@ -190,7 +225,7 @@
       f.m.rotation.x += f.ax * dt; f.m.rotation.z += f.az * dt;
       const r = Math.hypot(f.m.position.x, f.m.position.z);
       if (r < DG.R_ARENA + 0.5 && f.m.position.y < bowl(r) && f.vy < 0) { f.m.position.y = bowl(r); f.vy *= -0.35; f.vx *= 0.6; f.vz *= 0.6; f.ax *= 0.5; f.az *= 0.5; }
-      if (f.t > 3.5 || f.m.position.y < -6) { root.remove(f.m); f.m.geometry.dispose(); flying.splice(i, 1); }
+      if (f.t > 2.4 || f.m.position.y < -6) { root.remove(f.m); f.m.geometry.dispose(); flying.splice(i, 1); }
     }
     for (let i = sparks.length - 1; i >= 0; i--) {
       const s = sparks[i]; s.t += dt; const a = s.p.geometry.attributes.position;
@@ -223,7 +258,7 @@
       cam.position.lerp(new T.Vector3(0.001, h, 0.001), 1 - Math.pow(0.02, dt));
       cam.up.set(0, 0, -1); cam.lookAt(0, 0, 0);
       cam.position.x += sx; cam.position.z += sy;
-    } else if (ctl) { cam.up.set(0, 1, 0); ctl.update(); }
+    } else if (mode === 'free' && ctl) { cam.up.set(0, 1, 0); ctl.update(); }
   }
   // ---------- タイトルの後ろ・作る画面用：コマを1つだけ回す ----------
   V3.showTops = function (list) { if (!ok) return; V3.clear(); V3.m = null; tops = list.map(o => buildTop(o)); };

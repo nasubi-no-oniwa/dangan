@@ -228,7 +228,7 @@
       // 暴れているほど、当てる力も強い（こだわりの分、強みと弱みがはっきり出る）
       const ragA = 1 + Math.min(1, A.wob()) * 0.8, ragB = 1 + Math.min(1, B.wob()) * 0.8;
       this.hitN++;
-      const ev = { k: 'hit', x: px, y: py, v: vn, br: [0, 0], burst: [] };
+      const ev = { k: 'hit', x: px, y: py, v: vn, br: [0, 0], burst: [], lay: [layA, layB] };
       const bA = this.apply(A, dmA * selfA * ragB, px, py), bB = this.apply(B, dmB * selfB * ragA, px, py);
       ev.br = [bA, bB];
       if (bB > 0) { A.dealt += bB; if (bB > A.best.a) A.best = { a: bB, layer: layA }; }
