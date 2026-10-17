@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>弾丸合併</title>
+<meta name="description" content="市町村や国を3つ、1本の軸で串ざしにしてコマを作る。本物の形がはみ出してぶつかり、削れ合う。">
+<meta name="theme-color" content="#2a211b">
+<meta property="og:title" content="弾丸合併">
+<meta property="og:description" content="市町村や国を3つ、1本の軸で串ざしにしてコマを作る。本物の形がはみ出してぶつかり、削れ合う。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://nasubi-no-oniwa.github.io/dangan/">
+<meta property="og:site_name" content="なすびのお庭">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=1">
+</head>
+<body>
+<canvas id="arena3"></canvas>
+<canvas id="arena2" class="hide"></canvas>
+
+<!-- タイトル -->
+<section class="screen active" id="s-title">
+  <div class="t-wrap">
+    <div class="logo"><span class="l1">弾丸</span><span class="l2">合併</span></div>
+    <p class="sub">市町村や国を<b>3つ</b>、1本の軸で<b>串ざし</b>。<br>はみ出した<b>本物の形</b>がぶつかって削れ合う。</p>
+    <div class="t-btns">
+      <button class="btn big hot" id="btn-build">コマを作る</button>
+      <button class="btn big blue" id="btn-vs">対戦する</button>
+      <div class="row">
+        <button class="btn sm2" id="btn-saved">保存したコマ</button>
+        <button class="btn sm2" id="btn-howto">あそびかた</button>
+        <button class="btn sm2" id="btn-snd">音：<span id="snd-name">あり</span></button>
+      </div>
+      <a class="jimoto" href="../jimoto/">地元の最強で、形どうしを戦わせる →</a>
+    </div>
+    <p class="loading" id="loading">市町村を読みこみ中…</p>
+  </div>
+</section>
+
+<!-- 作る -->
+<section class="screen" id="s-build">
+  <header class="bar">
+    <button class="btn sm ghost" id="b-back">← もどる</button>
+    <div class="b-name" id="b-name">…</div>
+    <button class="btn sm" id="b-random">おまかせ合併</button>
+  </header>
+  <div class="b-main">
+    <div class="b-top">
+      <div class="b-prev"><canvas id="b-cv"></canvas></div>
+      <div class="b-stats" id="b-stats"></div>
+    </div>
+    <div class="b-edit">
+      <div class="tabs" id="b-tabs"></div>
+      <div class="b-panel">
+        <div class="b-cur">
+          <div class="b-hole"><canvas id="b-hcv"></canvas><div class="b-hlab" id="b-hlab"></div></div>
+          <div class="b-info">
+            <div class="b-cname" id="b-cname"></div>
+            <div class="b-meta" id="b-meta"></div>
+            <div class="b-rot">
+              <button class="btn sm" id="b-rl" aria-label="左に45度">⟲</button>
+              <span id="b-ang">0°</span>
+              <button class="btn sm" id="b-rr" aria-label="右に45度">⟳</button>
+            </div>
+            <div class="b-tip">形の上の<b>●</b>をおして、軸をさす所をえらぶ</div>
+          </div>
+        </div>
+        <div class="b-search">
+          <input id="b-q" type="search" placeholder="市町村・国をさがす（例：大垣市、チリ）" autocomplete="off" enterkeyhint="search">
+        </div>
+        <div class="b-list" id="b-list"></div>
+      </div>
+    </div>
+  </div>
+  <footer class="bar bottom">
+    <button class="btn" id="b-try">試し回し</button>
+    <button class="btn" id="b-save">保存</button>
+    <button class="btn hot" id="b-go">これで戦う</button>
+  </footer>
+</section>
+
+<!-- 対戦の相手えらび -->
+<section class="screen" id="s-vs">
+  <header class="bar">
+    <button class="btn sm ghost" id="v-back">← もどる</button>
+    <div class="v-title">対戦</div>
+  </header>
+  <div class="v-slots">
+    <div class="v-slot" id="v-s0"></div>
+    <div class="v-mid">VS</div>
+    <div class="v-slot" id="v-s1"></div>
+  </div>
+  <footer class="bar bottom"><button class="btn big hot" id="v-go">対戦！</button></footer>
+</section>
+
+<!-- 保存したコマ -->
+<section class="screen" id="s-saved">
+  <header class="bar">
+    <button class="btn sm ghost" id="sv-back">← もどる</button>
+    <div class="v-title" id="sv-title">保存したコマ</div>
+  </header>
+  <div class="sv-list" id="sv-list"></div>
+</section>
+
+<!-- 合体 -->
+<section class="screen" id="s-merge"><div class="mg" id="mg"></div></section>
+
+<!-- 試合 -->
+<section class="screen" id="s-battle">
+  <div class="hud">
+    <div class="pl p0" id="h0"></div>
+    <div class="clock" id="clock">60</div>
+    <div class="pl p1" id="h1"></div>
+  </div>
+  <div class="callout" id="callout"></div>
+  <div class="cam">
+    <button class="btn sm ghost" id="c-auto">おまかせ視点</button>
+    <button class="btn sm ghost" id="c-top">真上</button>
+    <button class="btn sm ghost" id="c-dim">2D</button>
+  </div>
+  <button class="btn sm ghost quit" id="c-quit">やめる</button>
+  <div class="hint3d" id="hint3d">ドラッグで回す・ピンチで寄る</div>
+</section>
+
+<!-- 結果 -->
+<section class="screen" id="s-result">
+  <div class="card res" id="res"></div>
+</section>
+
+<!-- あそびかた -->
+<div class="modal hide" id="m-howto"><div class="card">
+  <h2>あそびかた</h2>
+  <p>① <b>上段・中段・下段</b>に、市町村や国を1つずつえらぶ。中段がいちばん大きくなる。</p>
+  <p>② それぞれの形の<b>どこに軸をさすか</b>（●）と、<b>向き</b>（45°ずつ）を決める。</p>
+  <p>③ あとは全自動。<b>外にはみ出した所</b>が当たって削れていく。</p>
+  <p>・先に<b>65%削られた方の負け</b>。60秒たったら残りの多い方の勝ち。</p>
+  <p>・削れるほど軽くなって<b>速くなる</b>。重心からずれた所にさすと<b>暴れる</b>。</p>
+  <p>・軸のまわりまで削れた段は<b>合併解消</b>（その段ごと外れる）。</p>
+  <p>・上段はとがり・強さ、中段は体力・守り、下段は速さがききやすい。</p>
+  <div class="row"><button class="btn hot" data-close>わかった</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+<script src="js/data.js?v=1"></script>
+<script src="js/geo.js?v=1"></script>
+<script src="js/sim.js?v=1"></script>
+<script src="js/top.js?v=1"></script>
+<script src="js/view3d.js?v=1"></script>
+<script src="js/view2d.js?v=1"></script>
+<script src="js/sound.js?v=1"></script>
+<script src="js/main.js?v=1"></script>
+</body>
+</html>
