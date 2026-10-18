@@ -68,6 +68,7 @@
       if (st.demo) { setTimeout(() => { if (st.demo && st.scr === 'title') demo(); }, 1500); return; }
       S.humStop(); callout(m.endBy === 'time' ? '時間切れ！' : '決着！');
       if (st.onEnd) { try { st.onEnd(m); } catch (e) { } st.onEnd = null; }
+      st.snap = null; st.imgReady = false; setTimeout(() => { if (st.m === m) st.snap = DG.grabSnap(is3); }, 350);
       setTimeout(() => document.body.classList.remove('slow'), 1200);
       setTimeout(result, 2000);
     }
@@ -365,6 +366,7 @@
     const why = w < 0 ? (m.mirror ? '同じコマどうしは引き分け' : '残りが同じ') : m.endBy === 'time' ? '60秒たって、残りが多かった' : '相手を65%削った';
     $('res').innerHTML = `<h2>${w < 0 ? '引き分け' : `<span class="wn w${w}">${esc(nm[w])}</span>の勝ち！`}</h2><div class="why">${why}（${m.t.toFixed(1)}秒）</div>
       <table><tr><th></th><th class="c0">${esc(nm[0])}</th><th class="c1">${esc(nm[1])}</th></tr>${rows.map(([lab, f]) => `<tr><td>${lab}</td><td>${f(O[0], O[1])}</td><td>${f(O[1], O[0])}</td></tr>`).join('')}</table>
+      <button class="btn big gold img-btn" data-a="img">${w < 0 || (st.mode === 'net' && DG.room && w !== DG.room.slot) ? '結果画像を出す' : '勝利画像を出す'}</button>
       <p class="res-note" id="res-note">${esc(st.netNote || '')}</p>
       <div class="row">${btns()}</div>`;
     function btns() {
@@ -388,8 +390,46 @@
       else if (a === 'netagain') { DG.Net.again(); b.disabled = true; b.textContent = 'あいてを待っています…'; }
       else if (a === 'leave') { DG.Net.leave(); toTitle(); }
       else if (a === 'title') toTitle();
+      else if (a === 'img') openImage(b);
     };
   }
+  // ---------- 結果画像と投稿 ----------
+  const URL_GAME = 'https://nasubi-no-oniwa.github.io/dangan/';
+  function shareText() {
+    const m = st.m, sp = [st.match.a, st.match.b], nm = sp.map(DG.nameOf), w = m.winner;
+    const tags = DG.resultTags(m, st.chal).filter(t => !/挑戦状$/.test(t.t)).map(t => t.t.replace(/！$/, ''));
+    let t = (tags.length ? '【' + tags.join('・') + '】' : '');
+    if (w < 0) t += `${nm[0]}と${nm[1]}は引き分け`;
+    else { const W_ = w ? m.B : m.A; t += `${nm[w]}が${nm[1 - w]}を破った！（HP${Math.ceil(Math.max(0, (W_.ratio() - DG.LOSE) / (1 - DG.LOSE)) * 100)}残し）`; }
+    if (st.chal) t += `\n${st.chal.n}さんの挑戦状に挑戦！あなたも→ ${DG.Chal.link(st.chal.id)}`;
+    else { const k = w < 0 ? sp[0] : sp[w]; t += `\nこのコマと戦う→ ${URL_GAME}?t=${encodeURIComponent(DG.encode(k))}`; }
+    return t + '\n#弾丸合併';
+  }
+  async function openImage(btn) {
+    const cv = $('res-img'); btn.disabled = true; const t0 = btn.textContent; btn.textContent = '画像を作っています…';
+    try {
+      if (!st.snap) st.snap = DG.grabSnap(is3);
+      if (!st.imgReady) { await DG.drawResultImage(cv, { m: st.m, snap: st.snap, spec: [st.match.a, st.match.b], chal: st.chal, url: URL_GAME }); st.imgReady = true; }
+      const old = $('iv-img').src; if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
+      $('iv-img').src = await new Promise(res => cv.toBlob(b => res(b ? URL.createObjectURL(b) : cv.toDataURL('image/png')), 'image/png'));
+      $('imgview').classList.remove('hide');
+    } catch (e) { console.error(e); toast('画像を作れませんでした'); }
+    btn.disabled = false; btn.textContent = t0;
+  }
+  function saveImg(blob) {
+    const go = b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'dangan-gappei.png'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); };
+    if (blob) go(blob); else $('res-img').toBlob(go, 'image/png');
+  }
+  $('iv-share').onclick = async () => {
+    const text = shareText(), blob = await new Promise(r => $('res-img').toBlob(r, 'image/png'));
+    try { const file = new File([blob], 'dangan.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    saveImg(blob); window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank');
+    toast('画像を保存しました。投稿画面に貼りつけてください');
+  };
+  $('iv-save').onclick = () => saveImg();
+  $('iv-close').onclick = () => $('imgview').classList.add('hide');
+  $('imgview').addEventListener('click', ev => { if (ev.target.id === 'imgview') $('imgview').classList.add('hide'); });
+  DG.shareText = shareText;
   DG.netNote = () => { const e = $('res-note'); if (e && st.scr === 'result' && st.mode !== 'local') e.textContent = st.netNote || ''; };
   // ---------- タイトル ----------
   function toTitle() {

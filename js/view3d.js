@@ -262,5 +262,6 @@
   }
   // ---------- タイトルの後ろ・作る画面用：コマを1つだけ回す ----------
   V3.showTops = function (list) { if (!ok) return; V3.clear(); V3.m = null; tops = list.map(o => buildTop(o)); };
+  V3.canvasNow = function () { if (!ok) return null; R.render(scene, cam); return R.domElement; };
   V3.snapshot = function () { try { R.render(scene, cam); return R.domElement.toDataURL('image/png'); } catch (e) { return null; } };
 })();

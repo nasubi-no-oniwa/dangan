@@ -280,3 +280,10 @@ body.slow #s-battle::after { content: ''; position: absolute; inset: 0; pointer-
 .spd span { color: #fff; font-size: 12px; text-shadow: 0 1px 3px #000; margin-right: 2px; }
 .spd .btn { padding: 6px 10px; font-size: 13px; }
 .hint3d { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 92px); }
+
+/* 結果画像 */
+.img-btn { display: block; margin: 10px auto 0; min-width: 240px; }
+#imgview { z-index: 25; background: rgba(15,11,8,.86); }
+.iv { padding: 12px; text-align: center; max-width: min(940px, 100%); }
+.iv img { display: block; margin: 0 auto; width: auto; max-width: 100%; height: auto; max-height: calc(100vh - 150px); object-fit: contain; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.35); -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto; }
+.iv .note { margin: 6px 0 0; }

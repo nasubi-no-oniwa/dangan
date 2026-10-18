@@ -24,8 +24,8 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=5">
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
 <canvas id="arena3"></canvas>
@@ -219,22 +219,31 @@
   <div class="row"><button class="btn hot" data-close>わかった</button></div>
 </div></div>
 
+<!-- 結果画像 -->
+<div class="modal hide" id="imgview"><div class="card iv">
+  <img id="iv-img" alt="結果画像">
+  <div class="row"><button class="btn hot" id="iv-share">Xに投稿</button><button class="btn" id="iv-save">画像を保存</button><button class="btn" id="iv-close">とじる</button></div>
+  <p class="note">画像を長押しでも保存できます</p>
+</div></div>
+<canvas id="res-img" width="1200" height="675" hidden></canvas>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
-<script src="js/data.js?v=5"></script>
-<script src="js/geo.js?v=5"></script>
-<script src="js/sim.js?v=5"></script>
-<script src="js/top.js?v=5"></script>
-<script src="js/view3d.js?v=5"></script>
-<script src="js/view2d.js?v=5"></script>
-<script src="js/sound.js?v=5"></script>
-<script src="js/firebase-config.js?v=5"></script>
-<script src="js/qm.js?v=5"></script>
-<script src="js/online.js?v=5"></script>
-<script src="js/chal.js?v=5"></script>
-<script src="js/main.js?v=5"></script>
+<script src="js/data.js?v=6"></script>
+<script src="js/geo.js?v=6"></script>
+<script src="js/sim.js?v=6"></script>
+<script src="js/top.js?v=6"></script>
+<script src="js/view3d.js?v=6"></script>
+<script src="js/view2d.js?v=6"></script>
+<script src="js/resimg.js?v=6"></script>
+<script src="js/sound.js?v=6"></script>
+<script src="js/firebase-config.js?v=6"></script>
+<script src="js/qm.js?v=6"></script>
+<script src="js/online.js?v=6"></script>
+<script src="js/chal.js?v=6"></script>
+<script src="js/main.js?v=6"></script>
 </body>
 </html>
