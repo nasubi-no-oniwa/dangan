@@ -6,6 +6,15 @@
 // =============================================
 (function () {
   const DG = window.DG, D = JM.D;
+  const T = (k, v) => (window.I18N ? I18N.t(k, v) : k);
+  const LG = () => (window.I18N && I18N.lang) || 'ja';
+  DG.T = T; DG.lang = LG;
+  // 画面に出す段の名前（DG.TIER は日本語のまま残す）
+  DG.tierN = i => T(['tier_top', 'tier_mid', 'tier_bot'][i]);
+  DG.tierS = i => T(['tier_top_s', 'tier_mid_s', 'tier_bot_s'][i]);
+  // データベースに入っている既定の名前「ななし」は、表示のときだけ訳す
+  DG.who = n => (!n || n === 'ななし') ? T('noname') : n;
+  DG.dn = e => (e && (e.dn || e.n)) || '';
   const cache = new Map();
   // 材料：{ e, parts（面積1・重心が原点）, holes }
   DG.part = async function (id) {
@@ -49,7 +58,7 @@
   // 上段：とがり・強さ（当てる所）／中段：体力・守り（本体）／下段：速さ（動き回る）
   DG.hint = function (e) {
     const s = e.st, v = [s[1] + s[3], s[0] + s[2], s[4] * 2], t = v.indexOf(Math.max(...v));
-    return { t, txt: DG.TIER[t] + '向き' };
+    return { t, txt: T('fit_tier', { t: DG.tierN(t) }) };
   };
   // ---------- 保存（この端末だけ） ----------
   const KEY = 'dangan_tops';
@@ -67,7 +76,40 @@
     const spec = a.map(s => { const m = s.match(/^(.+)\.(\d)\.(\d)$/); return m && D.byId.has(m[1]) ? [m[1], +m[2], +m[3] % 8] : null; });
     return spec.every(Boolean) ? spec : null;
   };
-  DG.nameOf = spec => DG.mergeName(spec.map(s => D.byId.get(s[0]).n));
+  DG.nameOf = spec => DG.mergeName(spec.map(s => D.byId.get(s[0]).n));   // 保存・比較用（日本語のまま）
+  // ---------- 画面に出す合併名（外国語のときは、表示用の地名 e.dn から作る） ----------
+  //  英語：上と中の語幹（City/Town/Village/Ward などを落とす）と下段の名前を「-」でつなぐ（例：Ogaki-Hokkaidō-Chiyoda City）
+  //  中国語・韓国語：日本語と同じく語幹をそのままつなぐ（例：大垣北海道千代田區→大垣北海千代田區、오가키홋카이지요다구）。ローマ字の地名をはさむときだけ「-」
+  const DSUF = {
+    zh: ['民主人民共和國', '人民民主共和國', '民主共和國', '人民共和國', '社會主義共和國', '伊斯蘭共和國', '聯合大公國', '聯合王國', '合眾國', '共和國', '大公國', '聯邦', '王國', '公國', '帝國', '支廳', '島廳', '市', '町', '村', '區', '区', '郡', '都', '道', '府', '縣', '県', '州', '省'],
+    ko: ['민주인민공화국', '인민민주공화국', '민주공화국', '인민공화국', '사회주의공화국', '이슬람공화국', '연합왕국', '합중국', '공화국', '대공국', '연방', '왕국', '공국', '제국', '시', '정', '촌', '구', '군', '도', '부', '현', '주', '성'],
+  };
+  const EN_SUF = / (City|Town|Village|Ward|District|County|Prefecture|Province|Subprefecture|Region|Oblast|Governorate)$/i;
+  const clean0 = n => String(n || '').replace(/[（(].*$/, '').trim();
+  function dstem(n, L) {
+    n = clean0(n);
+    if (L === 'en') { n = n.split(',')[0].trim(); return n.replace(EN_SUF, '') || n; }
+    n = sq(n);
+    for (const s of DSUF[L] || []) if (n.length > s.length + 1 && n.endsWith(s)) return n.slice(0, -s.length);
+    return n;
+  }
+  function dlast(n, L) { n = clean0(n); return L === 'en' ? n.split(',')[0].trim() : sq(n); }
+  const LAT = /[A-Za-z\u00c0-\u024f0-9]/;
+  // 漢字・ハングルどうしの間の空白だけつめる（「삿포로시 주오구」→「삿포로시주오구」、ローマ字の地名の空白は残す）
+  function sq(n) { const w = n.split(/\s+/).filter(Boolean); let s = w[0] || ''; for (let i = 1; i < w.length; i++) s += (LAT.test(s.slice(-1)) || LAT.test(w[i][0]) ? ' ' : '') + w[i]; return s; }
+  // 表示用の合併名と、改行してよい位置（上｜中｜下のつなぎ目）
+  DG.dispNameCuts = function (spec) {
+    const es = spec.map(s => D.byId.get(s[0])), L = LG();
+    if (L === 'ja') { const a = stem(es[0].n).length, b = stem(es[1].n).length; return { s: DG.nameOf(spec), cuts: [a, a + b] }; }
+    const p = [dstem(DG.dn(es[0]), L), dstem(DG.dn(es[1]), L), dlast(DG.dn(es[2]), L)];
+    let s = p[0]; const cuts = [];
+    for (let i = 1; i < 3; i++) {
+      const sep = L === 'en' || LAT.test(s.slice(-1)) || LAT.test(p[i][0] || '') ? '-' : '';
+      s += sep; cuts.push(s.length); s += p[i];
+    }
+    return { s, cuts };
+  };
+  DG.dispName = spec => DG.dispNameCuts(spec).s;
   // おまかせ合併：中段は大きめ・強めの所、上下はとがった所・速い所から選ぶ
   DG.random = function (rnd) {
     rnd = rnd || Math.random;

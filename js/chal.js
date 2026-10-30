@@ -15,6 +15,8 @@
 // =============================================
 (function () {
   const DG = window.DG, JM = window.JM, D = JM.D;
+  const T = (k, v) => I18N.t(k, v);
+  const who = n => DG.who(n);
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } } };
@@ -25,7 +27,7 @@
   const mine = () => store.get('dg_mychal', []);
   const toks = () => store.get('dg_mytok', {});
   const done = () => store.get('dg_chaldone', []);
-  const recText = c => (c.w || c.l) ? `${c.w || 0}勝${c.l || 0}敗` : 'まだだれも挑戦していない';
+  const recText = c => (c.w || c.l) ? T('wl', { w: c.w || 0, l: c.l || 0 }) : T('no_chal_yet');
   const myName = () => { try { return localStorage.getItem('dangan_name') || localStorage.getItem('jm_name') || ''; } catch (e) { return ''; } };
   const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
   C.link = id => URL_GAME + '?c=' + encodeURIComponent(id);
@@ -35,10 +37,12 @@
   let regions = null;
   function regs() {
     if (regions) return regions;
-    const jp = D.pref.slice(0, 47).map((n, i) => ({ k: 'J' + String(i + 1).padStart(2, '0'), n })), seen = new Map();
-    for (const e of D.list) if (e.p >= 100 && !seen.has(e.p)) seen.set(e.p, e.pn);
-    const world = [...seen.entries()].map(([p, n]) => ({ k: 'C' + p, n })).sort((a, b) => a.n.localeCompare(b.n, 'ja'));
-    regions = { jp, world, all: [...jp, { k: 'W', n: '世界の国・昔の国' }, ...world] };
+    // 名前は表示用（D.dpref・e.dpn）。言語を切りかえたら作りなおす
+    const jp = D.pref.slice(0, 47).map((n, i) => ({ k: 'J' + String(i + 1).padStart(2, '0'), n: (D.dpref && D.dpref[i]) || n })), seen = new Map();
+    for (const e of D.list) if (e.p >= 100 && !seen.has(e.p)) seen.set(e.p, e.dpn || e.pn);
+    const lc = I18N.lang === 'zh' ? 'zh-Hant' : I18N.lang;
+    const world = [...seen.entries()].map(([p, n]) => ({ k: 'C' + p, n })).sort((a, b) => a.n.localeCompare(b.n, lc));
+    regions = { jp, world, all: [...jp, { k: 'W', n: T('w_region') }, ...world] };
     regions.name = k => (regions.all.find(r => r.k === k) || { n: '' }).n;
     return regions;
   }
@@ -107,22 +111,22 @@
   // ---------- 挑戦状と戦う ----------
   C.open = async function (fromWait) {
     try {
-      if (!D.ready) throw new Error('市町村を読みこみ中です。少し待ってください');
-      DG.toast('挑戦状をさがしています…');
+      if (!D.ready) throw new Error(T('loading_wait'));
+      DG.toast(T('chal_searching'));
       const L = await list();
       const my = new Set(mine()), dn = new Set(done());
       let cand = L.filter(c => !my.has(c.id) && !dn.has(c.id));
       if (!cand.length) cand = L.filter(c => !my.has(c.id));
-      if (!cand.length) { DG.toast(L.length ? 'いまある挑戦状は、ぜんぶあなたのものです' : 'まだ挑戦状がありません。試合のあとに置いてみよう'); return false; }
+      if (!cand.length) { DG.toast(T(L.length ? 'chal_allmine' : 'chal_none')); return false; }
       let sum = 0; const wts = cand.map((c, i) => (sum += 1 + i / cand.length * 2));
       const r = Math.random() * sum; const c = cand[wts.findIndex(w => w >= r)] || cand[cand.length - 1];
       C.start(c); return true;
-    } catch (e) { DG.toast(e.message && !/^http/.test(e.message) ? e.message : '挑戦状を読みこめませんでした'); return false; }
+    } catch (e) { DG.toast(e.message && !/^http/.test(e.message) ? e.message : T('chal_loadfail')); return false; }
   };
   C.start = function (c) {
     const s = DG.st; s.chal = c; s.chalRec = false; s.tmp = false;
-    s.vs[1] = DG.decode(c.k); s.vsLab[1] = `${c.n}さんの挑戦状（${recText(c)}）`;
-    if (!s.vs[0]) { s.vs[0] = DG.curSpec() || DG.random(); s.vsLab[0] = '作ったコマ'; }
+    s.vs[1] = DG.decode(c.k); s.vsLab[1] = () => T('lab_chal', { n: who(c.n), r: recText(c) });
+    if (!s.vs[0]) { s.vs[0] = DG.curSpec() || DG.random(); s.vsLab[0] = () => T('lab_made'); }
     DG.openVs();
   };
   C.fromLink = async function () {
@@ -131,24 +135,24 @@
     try { history.replaceState(null, '', location.pathname); } catch (e) { }
     try {
       const [c, ret] = await Promise.all([getChal(id), retiredSet(true)]);
-      if (!c || !usable(c, ret)) { DG.toast(c && ret.has(id) ? 'この挑戦状は引退しました' : 'この挑戦状は見つかりませんでした'); return false; }
-      C.start(c); DG.toast(`${c.n}さんの挑戦状が届きました`); return true;
-    } catch (e) { DG.toast('挑戦状を読みこめませんでした'); return false; }
+      if (!c || !usable(c, ret)) { DG.toast(T(c && ret.has(id) ? 'chal_retired' : 'chal_notfound')); return false; }
+      C.start(c); DG.toast(T('chal_arrived', { n: who(c.n) })); return true;
+    } catch (e) { DG.toast(T('chal_loadfail')); return false; }
   };
   C.end = function () { const s = DG.st; s.chal = null; s.chalRec = false; };
   // 試合が終わった：挑戦状の成績をつける（1つの挑戦状につき1回だけ）。赤＝挑んだ側
   C.onResult = async function (winner, mySpec) {
     const s = DG.st, c = s.chal; if (!c) return null;
-    let note = winner === 0 ? `${c.n}さんの挑戦状に勝った！` : winner === 1 ? `${c.n}さんの挑戦状に負けた…` : `${c.n}さんの挑戦状と引き分け`;
+    let note = T(winner === 0 ? 'chal_won' : winner === 1 ? 'chal_lost' : 'chal_draw', { n: who(c.n) });
     const dn = done();
-    if (s.chalRec || dn.includes(c.id) || winner < 0 || mine().includes(c.id)) { s.chalRec = true; return note + `（この挑戦状：${recText(c)}）`; }
+    if (s.chalRec || dn.includes(c.id) || winner < 0 || mine().includes(c.id)) { s.chalRec = true; return note + T('this_chal_rec', { r: recText(c) }); }
     s.chalRec = true;
     dn.push(c.id); store.set('dg_chaldone', dn.slice(-DONE_MAX));
     try {
       await put('dg_res/' + c.id + '/' + rid(), { k: DG.encode(mySpec), n: QM.ng(myName()) || 'ななし', w: winner === 0 ? 1 : 0, t: Date.now() });
       const v = await bump(c.id, winner); if (v) { c.w = v.w; c.l = v.l; }
     } catch (e) { }
-    return note + `（この挑戦状：${recText(c)}）`;
+    return note + T('this_chal_rec', { r: recText(c) });
   };
   // ---------- 投稿・リンク ----------
   C.shareText = async function (text) {
@@ -156,28 +160,28 @@
     window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank');
   };
   async function copy(t) {
-    try { await navigator.clipboard.writeText(t); DG.toast('コピーしました'); }
-    catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); DG.toast('コピーしました'); } catch (e2) { DG.toast('コピーできませんでした'); } a.remove(); }
+    try { await navigator.clipboard.writeText(t); DG.toast(T('copied')); }
+    catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); DG.toast(T('copied')); } catch (e2) { DG.toast(T('copy_fail')); } a.remove(); }
   }
   C.copy = copy;
-  const boshu = (sp, id) => `弾丸合併「${DG.nameOf(sp)}」で挑戦状を置きました。倒せるものなら倒してみて！\n${C.link(id)}\n#弾丸合併`;
+  const boshu = (sp, id) => T('boshu', { n: DG.dispName(sp), u: C.link(id) });
   // ---------- 挑戦状を置く（list：[{sp, lab}] の中からえらぶ） ----------
   C.put = function (items) {
     items = items.filter(x => x && x.sp); if (!items.length) return;
-    const card = QM.dialog(`<h3>挑戦状を置く</h3>
-      <p class="qm-sub">えらんだコマが、そのまま挑戦状になります。だれかが挑戦すると成績がつき、挑戦者をたくさん倒すと番付にのります（中段の県・国の番付）。</p>
-      <label class="qm-fld">なまえ<input id="ch-name" maxlength="8" autocomplete="off" placeholder="ななし" value="${esc(myName())}"></label>
+    const card = QM.dialog(`<h3>${T('put_chal')}</h3>
+      <p class="qm-sub">${T('put_sub')}</p>
+      <label class="qm-fld">${T('name')}<input id="ch-name" maxlength="8" autocomplete="off" placeholder="${esc(T('noname'))}" value="${esc(myName())}"></label>
       <p class="qm-err" id="ch-err"></p>
-      ${items.map((it, i) => `<button class="qm-b${i ? ' alt' : ''}" data-i="${i}">${esc(it.lab)}：${esc(DG.nameOf(it.sp))}を置く</button>`).join('')}
-      <button class="qm-b sub" id="ch-x">やめる</button>`);
+      ${items.map((it, i) => `<button class="qm-b${i ? ' alt' : ''}" data-i="${i}">${T('put_x', { l: esc(it.lab), n: esc(DG.dispName(it.sp)) })}</button>`).join('')}
+      <button class="qm-b sub" id="ch-x">${T('qm_cancel')}</button>`);
     card.querySelector('#ch-x').onclick = () => QM.close();
     card.querySelectorAll('[data-i]').forEach(b => b.onclick = async () => {
       const it = items[+b.dataset.i], n = card.querySelector('#ch-name').value.trim().slice(0, 8);
-      if (n && QM.isBad(n)) { card.querySelector('#ch-err').textContent = 'その名前は使えません。ほかの名前にしてね'; return; }
+      if (n && QM.isBad(n)) { card.querySelector('#ch-err').textContent = T('qm_badname'); return; }
       try { localStorage.setItem('dangan_name', n); } catch (e) { }
       card.querySelectorAll('button').forEach(x => { x.disabled = true; });
       try {
-        card.querySelector('#ch-err').textContent = '置いています…';
+        card.querySelector('#ch-err').textContent = T('putting');
         const id = rid(), tok = 't' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
         const v = { k: DG.encode(it.sp), n: QM.ng(n) || 'ななし', t: { '.sv': 'timestamp' }, w: 0, l: 0, p: C.region(it.sp) };
         await put('dg_chal/' + id, v);
@@ -185,16 +189,16 @@
         try { await put('dg_own/' + id, tok); const tk = toks(); tk[id] = tok; store.set('dg_mytok', tk); } catch (e) { }
         const sn = store.get('dg_seen', {}); sn[id] = Date.now(); store.set('dg_seen', sn);
         cache = null;
-        const dlg = QM.dialog(`<h3>挑戦状を置きました！</h3><p><b>${esc(DG.nameOf(it.sp))}</b></p>
-          <p class="qm-sub">リンクを送ると、その人とすぐ勝負できます。成績はタイトルの「あなたの挑戦状」で見られます。</p>
-          <button class="qm-b" id="ch-sh">挑戦者を募集する（投稿）</button><button class="qm-b alt" id="ch-cp">リンクをコピー</button><button class="qm-b sub" id="ch-ok">OK</button>`);
+        const dlg = QM.dialog(`<h3>${T('put_done')}</h3><p><b>${esc(DG.dispName(it.sp))}</b></p>
+          <p class="qm-sub">${T('put_done_sub')}</p>
+          <button class="qm-b" id="ch-sh">${T('recruit_post')}</button><button class="qm-b alt" id="ch-cp">${T('copy_link2')}</button><button class="qm-b sub" id="ch-ok">${T('ok')}</button>`);
         dlg.querySelector('#ch-sh').onclick = () => C.shareText(boshu(it.sp, id));
         dlg.querySelector('#ch-cp').onclick = () => copy(C.link(id));
         dlg.querySelector('#ch-ok').onclick = () => QM.close();
         C.mineSummary(true);
       } catch (e) {
         card.querySelectorAll('button').forEach(x => { x.disabled = false; });
-        card.querySelector('#ch-err').textContent = '置けませんでした。通信を確認してね';
+        card.querySelector('#ch-err').textContent = T('put_fail');
       }
     });
   };
@@ -217,13 +221,22 @@
       } catch (e) { }
     }));
     news = nw.sort((a, b) => b.t - a.t);
-    el.textContent = n ? `あなたの挑戦状 ${n}枚：${w}勝${l}敗` : '';
+    sumV = { n, w, l }; drawSum();
+  };
+  // 成績の文字（言語を切りかえたら、読みなおさずに描きなおす）
+  let sumV = null;
+  function drawSum() {
+    const el = $('chal-mine'), nb = $('chal-news'); if (!el || !sumV) return;
+    const { n, w, l } = sumV;
+    el.textContent = n ? T('mine_sum', { n, w, l }) : '';
     if (nb) {
       const lost = news.filter(r => r.w === 1).length, won = news.length - lost;
       nb.hidden = !news.length;
-      nb.innerHTML = lost ? `🔔 挑戦状が<b>${lost}回</b>破られました${won ? `・${won}勝` : ''}` : `🔔 挑戦状が<b>${won}回</b>勝ちました`;
+      nb.innerHTML = lost ? T('news_lost', { n: lost, x: won ? T('news_wonx', { w: won }) : '' }) : T('news_won', { n: won });
     }
-  };
+  }
+  document.addEventListener('langchange', () => { regions = null; const sel = $('bz-reg'); if (sel) sel.innerHTML = ''; drawSum(); });
+  document.addEventListener('namesrelabeled', () => { regions = null; const sel = $('bz-reg'); if (sel) sel.innerHTML = ''; });
   function markSeen() {
     const sn = store.get('dg_seen', {});
     for (const r of news) sn[r.cid] = Math.max(sn[r.cid] || 0, r.t);
@@ -231,20 +244,20 @@
   }
   // ---------- 仕返し：自分の挑戦状（赤）と、それを破った人のコマ（青） ----------
   C.revenge = function (c, r) {
-    const a = DG.decode(c.k), b = DG.decode(r.k); if (!a || !b) { DG.toast('コマが見つかりません'); return; }
+    const a = DG.decode(c.k), b = DG.decode(r.k); if (!a || !b) { DG.toast(T('no_top')); return; }
     const s = DG.st; s.chal = null; s.tmp = true;
-    s.vs[0] = a; s.vsLab[0] = 'あなたの挑戦状'; s.vs[1] = b; s.vsLab[1] = `${r.n}さんのコマ`;
-    DG.openVs(); DG.toast(`仕返し！青が${r.n}さんのコマです。赤を作り直して勝ちにいこう`);
+    s.vs[0] = a; s.vsLab[0] = () => T('lab_mychal'); s.vs[1] = b; s.vsLab[1] = () => T('lab_their', { n: who(r.n) });
+    DG.openVs(); DG.toast(T('revenge_toast', { n: who(r.n) }));
   };
   // ---------- あなたの挑戦状（画面） ----------
   function topCanvas(sp, px) { const cv = document.createElement('canvas'); cv.className = 'mc-shape'; cv.style.width = cv.style.height = px + 'px'; DG.preview(cv, sp); return cv; }
-  const ago = t => { const m = (Date.now() - t) / 60000; return m < 60 ? Math.max(1, Math.round(m)) + '分前' : m < 1440 ? Math.round(m / 60) + '時間前' : Math.round(m / 1440) + '日前'; };
+  const ago = t => { const m = (Date.now() - t) / 60000; return m < 60 ? T('min_ago', { n: Math.max(1, Math.round(m)) }) : m < 1440 ? T('hr_ago', { n: Math.round(m / 60) }) : T('day_ago', { n: Math.round(m / 1440) }); };
   C.openMine = async function () {
     DG.stopMatch(); DG.show('mine');
-    const box = $('mine-list'); box.innerHTML = '<p class="mc-empty">読みこみ中…</p>';
+    const box = $('mine-list'); box.innerHTML = '<p class="mc-empty">' + T('loading_s') + '</p>';
     const newIds = new Set(news.map(r => r.id)); markSeen();
     const ids = mine().slice().reverse(), tk = toks();
-    if (!ids.length) { box.innerHTML = '<p class="mc-empty">まだ挑戦状を置いていません。<br>試合のあとや「保存したコマ」から置けます。</p>'; return; }
+    if (!ids.length) { box.innerHTML = '<p class="mc-empty">' + T('mine_empty') + '</p>'; return; }
     let ret; try { ret = await retiredSet(true); } catch (e) { ret = new Set(); }
     const rows = await Promise.all(ids.map(async id => {
       try { const [c, rs] = await Promise.all([getChal(id), rest('dg_res/' + id, { orderBy: 't', limitToLast: 5 })]); return { id, c, rs: Object.entries(rs || {}).map(([k, v]) => Object.assign({ id: k }, v)).sort((a, b) => b.t - a.t) }; }
@@ -254,29 +267,29 @@
     box.innerHTML = '';
     for (const { id, c, rs, err } of rows) {
       const el = document.createElement('div'); el.className = 'mc';
-      if (err) { el.innerHTML = '<p class="mc-empty">読みこめませんでした。通信を確認してね</p>'; box.appendChild(el); continue; }
+      if (err) { el.innerHTML = '<p class="mc-empty">' + T('load_fail_net') + '</p>'; box.appendChild(el); continue; }
       const sp = c && DG.decode(c.k);
-      if (!c || !sp) { el.classList.add('gone'); el.innerHTML = '<p class="mc-empty">この挑戦状は見つかりませんでした</p>'; box.appendChild(el); continue; }
+      if (!c || !sp) { el.classList.add('gone'); el.innerHTML = '<p class="mc-empty">' + T('chal_notfound') + '</p>'; box.appendChild(el); continue; }
       const isRet = ret.has(id), hid = !!c.x;
       el.classList.toggle('gone', isRet || hid);
       const head = document.createElement('div'); head.className = 'mc-head';
       head.appendChild(topCanvas(sp, 64));
       const info = document.createElement('div'); info.className = 'mc-info';
-      info.innerHTML = `<b>${esc(DG.nameOf(sp))}</b><small>${DG.partsTxt(sp)}</small>
-        <div class="mc-rec"><span class="w">${c.w || 0}勝</span><span class="l">${c.l || 0}敗</span>${isRet ? '<em>引退</em>' : hid ? '<em>非表示</em>' : ''}<small>${ago(c.t)}に置いた</small></div>`;
+      info.innerHTML = `<b>${esc(DG.dispName(sp))}</b><small>${DG.partsTxt(sp)}</small>
+        <div class="mc-rec"><span class="w">${T('n_w', { n: c.w || 0 })}</span><span class="l">${T('n_l', { n: c.l || 0 })}</span>${isRet ? `<em>${T('retired')}</em>` : hid ? `<em>${T('hidden_s')}</em>` : ''}<small>${T('put_ago', { a: ago(c.t) })}</small></div>`;
       head.appendChild(info); el.appendChild(head);
       const ul = document.createElement('ul'); ul.className = 'mc-res';
-      if (!rs.length) ul.innerHTML = '<li class="none">まだだれも挑戦していません</li>';
+      if (!rs.length) ul.innerHTML = '<li class="none">' + T('none_challenged') + '</li>';
       for (const r of rs) {
         const rsp = DG.decode(r.k), li = document.createElement('li'); if (newIds.has(r.id)) li.classList.add('new');
-        li.innerHTML = `<span class="mk ${r.w ? 'l' : 'w'}">${r.w ? '負' : '勝'}</span><span class="who"><b>${esc(r.n)}</b>さんの${esc(rsp ? DG.nameOf(rsp) : '（わからないコマ）')}${r.w ? 'に破られた' : 'を倒した'}<small>${ago(r.t)}</small></span>`;
-        if (r.w && rsp && !isRet) { const b = document.createElement('button'); b.className = 'btn sm hot'; b.textContent = '仕返し'; b.onclick = () => C.revenge(c, r); li.appendChild(b); }
+        li.innerHTML = `<span class="mk ${r.w ? 'l' : 'w'}">${T(r.w ? 'mk_l' : 'mk_w')}</span><span class="who">${T(r.w ? 'res_lost' : 'res_won', { n: esc(who(r.n)), t: esc(rsp ? DG.dispName(rsp) : T('unknown_top')) })}<small>${ago(r.t)}</small></span>`;
+        if (r.w && rsp && !isRet) { const b = document.createElement('button'); b.className = 'btn sm hot'; b.textContent = T('revenge'); b.onclick = () => C.revenge(c, r); li.appendChild(b); }
         ul.appendChild(li);
       }
       el.appendChild(ul);
       if (!isRet && !hid) {
         const bt = document.createElement('div'); bt.className = 'mc-btns';
-        bt.innerHTML = `<button class="btn sm hot" data-a="sh">挑戦者を募集</button><button class="btn sm" data-a="cp">リンクをコピー</button>${tk[id] ? '<button class="btn sm" data-a="rt">引退させる</button>' : ''}`;
+        bt.innerHTML = `<button class="btn sm hot" data-a="sh">${T('recruit')}</button><button class="btn sm" data-a="cp">${T('copy_link2')}</button>${tk[id] ? `<button class="btn sm" data-a="rt">${T('retire')}</button>` : ''}`;
         bt.onclick = ev => { const a = ev.target.closest('button'); if (!a) return; if (a.dataset.a === 'sh') C.shareText(boshu(sp, id)); else if (a.dataset.a === 'cp') copy(C.link(id)); else if (a.dataset.a === 'rt') retire(id, sp); };
         el.appendChild(bt);
       }
@@ -284,67 +297,66 @@
     }
   };
   function retire(id, sp) {
-    const dlg = QM.dialog(`<h3>引退させますか？</h3><p><b>${esc(DG.nameOf(sp))}</b>の挑戦状は、もうだれとも戦わず、番付からも外れます。<br>もとにもどせません。</p><p class="qm-err" id="rt-err"></p><button class="qm-b" id="rt-ok">引退させる</button><button class="qm-b sub" id="rt-x">やめる</button>`);
+    const dlg = QM.dialog(`<h3>${T('retire_q')}</h3><p>${T('retire_body', { n: esc(DG.dispName(sp)) })}</p><p class="qm-err" id="rt-err"></p><button class="qm-b" id="rt-ok">${T('retire')}</button><button class="qm-b sub" id="rt-x">${T('qm_cancel')}</button>`);
     dlg.querySelector('#rt-x').onclick = () => QM.close();
     dlg.querySelector('#rt-ok').onclick = async () => {
       const tok = toks()[id]; if (!tok) return;
       dlg.querySelectorAll('button').forEach(b => { b.disabled = true; });
-      try { await put('dg_retire/' + id + '/' + tok, true); retired = null; cache = null; QM.close(); DG.toast('引退させました'); C.openMine(); C.mineSummary(true); }
-      catch (er) { dlg.querySelectorAll('button').forEach(b => { b.disabled = false; }); dlg.querySelector('#rt-err').textContent = 'できませんでした。通信を確認してね'; }
+      try { await put('dg_retire/' + id + '/' + tok, true); retired = null; cache = null; QM.close(); DG.toast(T('retired_toast')); C.openMine(); C.mineSummary(true); }
+      catch (er) { dlg.querySelectorAll('button').forEach(b => { b.disabled = false; }); dlg.querySelector('#rt-err').textContent = T('fail_net'); }
     };
   }
   // ---------- 引き継ぎコード ----------
   const CODE_CH = 'abcdefghjkmnpqrstuvwxyz23456789';
   C.xferOut = async function () {
-    const ids = mine(); if (!ids.length) { DG.toast('まだ挑戦状がありません'); return; }
+    const ids = mine(); if (!ids.length) { DG.toast(T('chal_none_s')); return; }
     const tk = toks(), v = ids.map(id => id + ':' + (tk[id] || '')).join(',');
     let code = ''; for (let i = 0; i < 10; i++) code += CODE_CH[Math.floor(Math.random() * CODE_CH.length)];
     try {
       await put('dg_xfer/' + code, { v, t: Date.now() });
       const shown = code.slice(0, 5) + '-' + code.slice(5);
-      const dlg = QM.dialog(`<h3>引き継ぎコード</h3><p class="xf-code">${shown}</p><p class="qm-sub">新しい端末の「あなたの挑戦状」→「コードを入れる」に入力すると、挑戦状（${ids.length}枚）を引き継げます。<br>コードは人に教えないでください（引退もできてしまいます）。</p><button class="qm-b" id="xf-cp">コピー</button><button class="qm-b sub" id="xf-ok">とじる</button>`);
+      const dlg = QM.dialog(`<h3>${T('xf_code_h')}</h3><p class="xf-code">${shown}</p><p class="qm-sub">${T('xf_code_sub', { n: ids.length })}</p><button class="qm-b" id="xf-cp">${T('copy')}</button><button class="qm-b sub" id="xf-ok">${T('close')}</button>`);
       dlg.querySelector('#xf-cp').onclick = () => copy(shown);
       dlg.querySelector('#xf-ok').onclick = () => QM.close();
-    } catch (e) { DG.toast('コードを作れませんでした。通信を確認してね'); }
+    } catch (e) { DG.toast(T('xf_fail')); }
   };
   C.xferIn = function () {
-    const dlg = QM.dialog(`<h3>コードを入れる</h3><p class="qm-sub">前の端末で出した引き継ぎコード（10文字）を入れてください。</p><label class="qm-fld">コード<input id="xf-in" maxlength="16" autocomplete="off" autocapitalize="off" placeholder="abcde-fghjk"></label><p class="qm-err" id="xf-err"></p><button class="qm-b" id="xf-go">引き継ぐ</button><button class="qm-b sub" id="xf-x">やめる</button>`);
+    const dlg = QM.dialog(`<h3>${T('xf_in')}</h3><p class="qm-sub">${T('xf_in_sub')}</p><label class="qm-fld">${T('code')}<input id="xf-in" maxlength="16" autocomplete="off" autocapitalize="off" placeholder="abcde-fghjk"></label><p class="qm-err" id="xf-err"></p><button class="qm-b" id="xf-go">${T('xf_go')}</button><button class="qm-b sub" id="xf-x">${T('qm_cancel')}</button>`);
     dlg.querySelector('#xf-x').onclick = () => QM.close();
     dlg.querySelector('#xf-go').onclick = async () => {
       const code = dlg.querySelector('#xf-in').value.toLowerCase().replace(/[^a-z0-9]/g, ''), err = dlg.querySelector('#xf-err');
-      if (code.length !== 10) { err.textContent = '10文字のコードを入れてください'; return; }
+      if (code.length !== 10) { err.textContent = T('xf_len'); return; }
       try {
-        const v = await rest('dg_xfer/' + code); if (!v || !v.v) { err.textContent = 'そのコードは見つかりませんでした'; return; }
+        const v = await rest('dg_xfer/' + code); if (!v || !v.v) { err.textContent = T('xf_notfound'); return; }
         const my = mine(), tk = toks(); let add = 0;
         for (const it of String(v.v).split(',')) { const [id, t] = it.split(':'); if (!id) continue; if (!my.includes(id)) { my.push(id); add++; } if (t) tk[id] = t; }
         store.set('dg_mychal', my.slice(-MINE_MAX)); store.set('dg_mytok', tk);
-        QM.close(); DG.toast(add ? `${add}枚の挑戦状を引き継ぎました` : 'もう全部この端末にあります'); C.openMine(); C.mineSummary(true);
-      } catch (e) { err.textContent = '読みこめませんでした。通信を確認してね'; }
+        QM.close(); DG.toast(add ? T('xf_added', { n: add }) : T('xf_already')); C.openMine(); C.mineSummary(true);
+      } catch (e) { err.textContent = T('load_fail_net'); }
     };
   };
   // ---------- 番付 ----------
-  const RANKS = ['横綱', '大関', '関脇', '小結'];
-  const rankName = i => i < 4 ? RANKS[i] : '前頭' + '一二三四五六'[i - 4] + '枚目';
+  const rankName = i => i < 4 ? T('rk' + i) : T('rk_mae', { n: I18N.lang === 'ja' ? '一二三四五六'[i - 4] : i - 3 });
   let bzToken = 0;
   C.openBanzuke = async function (key) {
     DG.stopMatch(); DG.show('bz');
     const R = regs(), sel = $('bz-reg');
     if (!sel.options.length) {
-      sel.innerHTML = `<optgroup label="日本（都道府県）">${R.jp.map(r => `<option value="${r.k}">${esc(r.n)}</option>`).join('')}</optgroup><optgroup label="世界"><option value="W">世界の国・昔の国</option>${R.world.map(r => `<option value="${r.k}">${esc(r.n)}</option>`).join('')}</optgroup>`;
+      sel.innerHTML = `<optgroup label="${esc(T('og_jp'))}">${R.jp.map(r => `<option value="${r.k}">${esc(r.n)}</option>`).join('')}</optgroup><optgroup label="${esc(T('og_world'))}"><option value="W">${esc(T('w_region'))}</option>${R.world.map(r => `<option value="${r.k}">${esc(r.n)}</option>`).join('')}</optgroup>`;
       sel.onchange = () => { store.set('dg_bzreg', sel.value); C.openBanzuke(sel.value); };
     }
     if (!key) { key = store.get('dg_bzreg', null); const my = mine(); if (!key && my.length) { try { const lc = await getChal(my[my.length - 1]); if (lc && lc.p) key = lc.p; } catch (e) { } } const cur = DG.curSpec(); if (!key && cur) key = C.region(cur); if (!key || !R.all.some(r => r.k === key)) key = 'J13'; }
     sel.value = key;
     const tokn = ++bzToken, box = $('bz-list'), stt = $('bz-st');
-    box.innerHTML = ''; stt.textContent = '読みこみ中…';
+    box.innerHTML = ''; stt.textContent = T('loading_s');
     let v, ret;
     try { [v, ret] = await Promise.all([rest('dg_chal', { orderBy: 'p', equalTo: key }), retiredSet()]); }
-    catch (e) { stt.textContent = '読みこめませんでした。通信を確認してね'; return; }
+    catch (e) { stt.textContent = T('load_fail_net'); return; }
     if (tokn !== bzToken) return;
     const since = Date.now() - BZ_DAYS * DAY;
     let cand = Object.entries(v || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => usable(c, ret) && (c.u || 0) >= since && (c.w || 0) > 0);
     cand.sort((a, b) => (b.w || 0) - (a.w || 0) || a.t - b.t); cand = cand.slice(0, 30);
-    if (!cand.length) { stt.textContent = ''; box.innerHTML = `<p class="mc-empty">まだ「${esc(R.name(key))}」の番付にのった挑戦状はありません。<br>中段に「${esc(R.name(key))}」の市町村・国を入れた挑戦状を置いて、挑戦者を倒すと番付にのります。</p>`; return; }
+    if (!cand.length) { stt.textContent = ''; box.innerHTML = `<p class="mc-empty">${T('bz_empty', { r: esc(R.name(key)) })}</p>`; return; }
     await Promise.all(cand.map(async c => {
       try { const rs = await rest('dg_res/' + c.id, { orderBy: 't', startAt: since, limitToLast: 200 }); c.res = Object.entries(rs || {}).map(([k, r]) => Object.assign({ id: k }, r)); }
       catch (e) { c.res = []; }
@@ -358,17 +370,17 @@
     const draw = () => {
       const show = cand.filter(c => c.vw > 0).sort((a, b) => b.vw - a.vw || (b.w || 0) - (a.w || 0) || a.t - b.t).slice(0, 10);
       box.innerHTML = '';
-      if (!show.length) { if (!busy) box.innerHTML = `<p class="mc-empty">この30日、「${esc(R.name(key))}」で挑戦者を倒した挑戦状はまだありません。</p>`; return; }
+      if (!show.length) { if (!busy) box.innerHTML = `<p class="mc-empty">${T('bz_empty30', { r: esc(R.name(key)) })}</p>`; return; }
       show.forEach((c, i) => {
         const sp = DG.decode(c.k), row = document.createElement('div'); row.className = 'bz-row' + (i === 0 ? ' top' : '');
         row.innerHTML = `<div class="bz-rank">${esc(rankName(i))}</div>`;
         row.appendChild(topCanvas(sp, 52));
         const info = document.createElement('div'); info.className = 'bz-info';
         const more = c.vi < Math.min(VMAX, c.wins.length);
-        info.innerHTML = `<small><b>${esc(c.n)}</b>さんの</small><b class="nm">${esc(DG.nameOf(sp))}</b><small>${DG.partsTxt(sp)}</small><span class="bz-w"><span>30日で<b>${c.vw}${c.vw >= VMAX ? '勝以上' : '勝'}</b></span><span>通算${c.w || 0}勝${c.l || 0}敗</span>${more ? '<i>確認中</i>' : ''}</span>`;
+        info.innerHTML = `<small>${T('bz_whose', { n: esc(who(c.n)) })}</small><b class="nm">${esc(DG.dispName(sp))}</b><small>${DG.partsTxt(sp)}</small><span class="bz-w"><span>${T(c.vw >= VMAX ? 'bz_30wp' : 'bz_30w', { w: c.vw })}</span><span>${T('bz_total', { w: c.w || 0, l: c.l || 0 })}</span>${more ? `<i>${T('checking')}</i>` : ''}</span>`;
         row.appendChild(info);
-        const b = document.createElement('button'); b.className = 'btn sm hot'; b.textContent = '挑む';
-        if (mine().includes(c.id)) { b.textContent = 'あなた'; b.disabled = true; } else b.onclick = () => { bzToken++; C.start(c); };
+        const b = document.createElement('button'); b.className = 'btn sm hot'; b.textContent = T('challenge');
+        if (mine().includes(c.id)) { b.textContent = T('you'); b.disabled = true; } else b.onclick = () => { bzToken++; C.start(c); };
         row.appendChild(b); box.appendChild(row);
       });
     };
@@ -377,7 +389,7 @@
     for (const [c, r] of jobs) {
       if (tokn !== bzToken) return;
       const key2 = c.id + '/' + r.id, known = ver()[key2] != null;
-      if (!known) { stt.textContent = `勝ちを確かめています… ${k + 1}/${jobs.length}`; await new Promise(res => setTimeout(res, 15)); }
+      if (!known) { stt.textContent = T('verifying', { k: k + 1, n: jobs.length }); await new Promise(res => setTimeout(res, 15)); }
       let ok = false; try { ok = await C.verify(c, r, key2); } catch (e) { ok = false; }
       k++; c.vi++; if (ok) c.vw++;
       if (!known || Date.now() - lastDraw > 400 || k === jobs.length) { draw(); lastDraw = Date.now(); }

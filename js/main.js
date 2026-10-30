@@ -3,6 +3,7 @@
 // =============================================
 (function () {
   const DG = window.DG, D = JM.D, S = DG.S;
+  const T = (k, v) => I18N.t(k, v);
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const st = { bg: true, mode: 'local', lmode: 'rec', sortK: 0, sortDir: -1, filt: 'all', scr: 'title', spec: null, cur: null, prev: null, tab: 1, vs: [null, null], vsLab: ['', ''], m: null, run: false, acc: 0, demo: false, trial: false, pickFor: -1, endAt: 0, rec: {} };
@@ -50,7 +51,7 @@
     // 重い端末は軽い表示に
     if (is3 && st.scr === 'battle' && st.run && fpsChecked < 2) {
       fpsT += dt; fpsN++;
-      if (fpsT > 4) { const fps = fpsN / fpsT; fpsT = 0; fpsN = 0; fpsChecked++; if (fps < 20) { if (!DG.V3.low) { DG.V3.degrade(); toast('軽い表示にしました'); } else { setView(false); toast('2Dの表示に切りかえました'); } } }
+      if (fpsT > 4) { const fps = fpsN / fpsT; fpsT = 0; fpsN = 0; fpsChecked++; if (fps < 20) { if (!DG.V3.low) { DG.V3.degrade(); toast(T('light_view')); } else { setView(false); toast(T('to2d')); } } }
     }
     requestAnimationFrame(loop);
   }
@@ -59,14 +60,14 @@
     for (const ev of m.ev) {
       V.event(ev);
       if (st.demo) continue;
-      if (ev.k === 'hit') { S.hit(ev.v, ev.burst.length > 0); if (ev.burst.length) { S.burst(); callout('合併解消！'); } }
+      if (ev.k === 'hit') { S.hit(ev.v, ev.burst.length > 0); if (ev.burst.length) { S.burst(); callout(T('co_burst')); } }
     }
     m.ev.length = 0;
     if (!st.demo) S.humSet(Math.hypot(m.A.vx, m.A.vy) + Math.hypot(m.B.vx, m.B.vy));
     if (m.over && st.run) {
       st.run = false;
       if (st.demo) { setTimeout(() => { if (st.demo && st.scr === 'title') demo(); }, 1500); return; }
-      S.humStop(); callout(m.endBy === 'time' ? '時間切れ！' : '決着！');
+      S.humStop(); callout(T(m.endBy === 'time' ? 'co_time' : 'co_end'));
       if (st.onEnd) { try { st.onEnd(m); } catch (e) { } st.onEnd = null; }
       st.snap = null; st.imgReady = false; setTimeout(() => { if (st.m === m) st.snap = DG.grabSnap(is3); }, 350);
       setTimeout(() => document.body.classList.remove('slow'), 1200);
@@ -102,7 +103,7 @@
   async function calc() {
     const n = ++calcN;
     try { const def = await DG.def(st.spec); if (n !== calcN) return; const s = DG.stats(def); if (n !== calcN) return; st.cur = s; }
-    catch (e) { console.warn(e); toast('形を読みこめませんでした'); }
+    catch (e) { console.warn(e); toast(T('shape_err')); }
   }
   async function change(fn) {
     const before = st.cur; fn(); saveCur(); renderBuild(false);
@@ -110,10 +111,11 @@
   }
   function renderBuild(list) {
     const sp = st.spec, es = sp.map(s => D.byId.get(s[0]));
-    $('b-name').textContent = DG.mergeName(es.map(e => e.n));
-    $('b-tabs').innerHTML = DG.TIER.map((t, i) => `<button class="tab${i === st.tab ? ' on' : ''}" data-t="${i}"><i style="background:${DG.TIER_COL[i]}"></i>${t}<span class="tn">${esc(es[i].n)}</span></button>`).join('');
+    $('b-name').textContent = DG.dispName(sp);
+    $('b-tabs').innerHTML = DG.TIER.map((t, i) => `<button class="tab${i === st.tab ? ' on' : ''}" data-t="${i}"><i style="background:${DG.TIER_COL[i]}"></i>${DG.tierN(i)}<span class="tn">${esc(DG.dn(es[i]))}</span></button>`).join('');
     const e = es[st.tab], b = D.badge(e), h = DG.hint(e);
-    $('b-cname').innerHTML = `${esc(e.n)}<small>${esc(e.pn || '')}${e.c ? ' ' + esc(e.c) : ''}${e.kd ? '（' + esc(e.kd) + '）' : ''}</small>`;
+    const dc = e.dc != null ? e.dc : e.c;   // よみ（かな）は日本語のときだけ
+    $('b-cname').innerHTML = `${esc(DG.dn(e))}<small>${esc((e.dpn != null ? e.dpn : e.pn) || '')}${dc ? ' ' + esc(dc) : ''}${e.kd && I18N.lang === 'ja' ? '（' + esc(e.kd) + '）' : ''}</small>`;
     $('b-meta').innerHTML = `<span class="tag${b.cur ? '' : ' old'}">${esc(b.txt)}</span><span class="tag h${h.t}">${h.txt}</span>`;
     $('b-ang').textContent = (sp[st.tab][2] * 45) + '°';
     drawHole(); drawPrev(); drawStats();
@@ -121,11 +123,11 @@
   }
   function drawStats() {
     const s = st.cur, p = st.prev;
-    if (!s) { $('b-stats').innerHTML = '<div class="st-note">計算中…</div>'; return; }
-    $('b-stats').innerHTML = STAT.map(([k, lab]) => {
+    if (!s) { $('b-stats').innerHTML = '<div class="st-note">' + T('calc') + '</div>'; return; }
+    $('b-stats').innerHTML = STAT.map(([k]) => { const lab = T('st_' + k);
       const v = s[k], d = p ? v - p[k] : 0;
       return `<div class="st"><span>${lab}</span><span class="bar2"><i style="width:${v}%;${k === 'wobble' ? 'background:#c77d1e' : ''}"></i></span><span class="d ${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${v}${d ? (d > 0 ? ' ↑' : ' ↓') + Math.abs(d) : ''}</span></div>`;
-    }).join('') + `<div class="b-out"><span class="st-note">はみ出し</span>${s.out.map((v, i) => `<span class="chip" style="background:${DG.TIER_COL[i]}">${DG.TIER[i][0]} ${v}%</span>`).join('')}</div><div class="st-note">${p ? '↑↓は前の作りとくらべて' : '外にはみ出した所が当たって削れる'}</div>`;
+    }).join('') + `<div class="b-out"><span class="st-note">${T('overhang')}</span>${s.out.map((v, i) => `<span class="chip" style="background:${DG.TIER_COL[i]}">${DG.tierS(i)} ${v}%</span>`).join('')}</div><div class="st-note">${T(p ? 'cmp_prev' : 'overhang_note')}</div>`;
   }
   function fitCanvas(cv) { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d)); if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } return [w, h]; }
   function drawPrev() {
@@ -140,6 +142,7 @@
     for (const f of o.layers[st.tab].frags) { g.beginPath(); for (let i = 0; i < f.poly.length; i += 2) { const x = w / 2 + f.poly[i] * k, y = h / 2 + f.poly[i + 1] * k; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.closePath(); g.stroke(); }
     g.setLineDash([]);
   }
+  const HK = { '重心': 'hk_com', 'はし': 'hk_end', 'とがり': 'hk_tip', '太い所': 'hk_fat', 'ほか': 'hk_other' };   // 穴の種類（geo.js は日本語のまま）
   let holePts = [];
   async function drawHole() {
     const cv = $('b-hcv'), [w, h] = fitCanvas(cv), g = cv.getContext('2d'), s = st.spec[st.tab];
@@ -160,7 +163,7 @@
       g.fillStyle = on ? '#2a1f17' : 'rgba(255,255,255,.92)'; g.fill(); g.lineWidth = 2; g.strokeStyle = on ? '#fff' : '#2a1f17'; g.stroke();
       g.fillStyle = on ? '#fff' : '#2a1f17'; g.font = `900 ${Math.round(R * 1.1)}px 'M PLUS Rounded 1c', sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(p.i + 1), p.x, p.y + 1);
     }
-    const sel = P.holes[s[1]]; $('b-hlab').textContent = sel ? `穴${s[1] + 1}：${sel.k}（${P.holes.length}個）` : '';
+    const sel = P.holes[s[1]]; $('b-hlab').textContent = sel ? T('hole_lab', { n: s[1] + 1, k: T(HK[sel.k] || 'hk_other'), c: P.holes.length }) : '';
   }
   $('b-hcv').addEventListener('click', ev => {
     const cv = $('b-hcv'), r = cv.getBoundingClientRect(), d = cv.width / r.width, x = (ev.clientX - r.left) * d, y = (ev.clientY - r.top) * d;
@@ -170,7 +173,7 @@
   $('b-rl').onclick = () => change(() => { const s = st.spec[st.tab]; s[2] = (s[2] + 7) % 8; });
   $('b-rr').onclick = () => change(() => { const s = st.spec[st.tab]; s[2] = (s[2] + 1) % 8; });
   $('b-tabs').addEventListener('click', ev => { const b = ev.target.closest('.tab'); if (!b) return; st.tab = +b.dataset.t; renderBuild(true); });
-  $('b-random').onclick = async () => { const before = st.cur; st.spec = DG.random(); await DG.fix(st.spec); saveCur(); renderBuild(true); await calc(); st.prev = before; renderBuild(false); toast('おまかせで合併しました'); };
+  $('b-random').onclick = async () => { const before = st.cur; st.spec = DG.random(); await DG.fix(st.spec); saveCur(); renderBuild(true); await calc(); st.prev = before; renderBuild(false); toast(T('auto_merged')); };
   // 候補の一覧
   let recCache = {};
   function rec(t) {
@@ -180,12 +183,13 @@
     return (recCache[t] = out);
   }
   // 並べかえ・しぼりこみ（元の数字：体力＝面積、勢い＝人口、かたさ＝まとまり、鋭さ＝トゲ、速さ＝人口密度）
-  const SORTK = [['0', '体力'], ['1', '勢い'], ['2', 'かたさ'], ['3', '鋭さ'], ['4', '速さ'], ['pop', '人口']];
-  const FILT = [['all', '全部'], ['now', '今ある'], ['old', 'なくなった'], ['jp', '日本'], ['world', '世界']];
+  const SORTK = [['0', 'sk_hp'], ['1', 'sk_mom'], ['2', 'sk_hard'], ['3', 'sk_sharp'], ['4', 'sk_speed'], ['pop', 'sk_pop']];   // 2つ目は訳のキー
+  const FILT = [['all', 'fl_all'], ['now', 'fl_now'], ['old', 'fl_old'], ['jp', 'fl_jp'], ['world', 'fl_world']];
   const sortVal = e => st.sortK === 'pop' ? (e.pop || 0) : e.st[+st.sortK];
   const passF = e => st.filt === 'all' || (st.filt === 'now' ? !e.t : st.filt === 'old' ? !!e.t : st.filt === 'jp' ? e.p <= 47 : e.p >= 48);
   function sorted(L) { const d = st.sortDir; return L.filter(passF).sort((a, b) => (sortVal(a) - sortVal(b)) * d || a.i - b.i); }
-  const fmtPop = v => v >= 1e8 ? (v / 1e8).toFixed(1) + '億' : v >= 1e4 ? Math.round(v / 1e4) + '万' : String(v);
+  const fmtPop = v => { const L = I18N.lang; if (L === 'en') return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'K' : String(v); const u = L === 'zh' ? ['億', '萬'] : L === 'ko' ? ['억', '만'] : ['億', '万']; return v >= 1e8 ? (v / 1e8).toFixed(1) + u[0] : v >= 1e4 ? Math.round(v / 1e4) + u[1] : String(v); };
+  const sortLab = () => T(SORTK.find(k => k[0] === String(st.sortK))[1]);
   let popReq = 0;
   async function renderList() {
     const q = $('b-q').value.trim(), cur = st.spec[st.tab][0], mode = st.lmode;
@@ -194,33 +198,37 @@
     let L, head, cnt = null;
     if (mode === 'sort') {
       const all = q ? D.search(q, 30000) : D.list; L = sorted(all); const n = L.length; L = L.slice(0, 80);
-      head = `${q ? '「' + esc(q) + '」' : '全体'}を${SORTK.find(k => k[0] === String(st.sortK))[1]}の${st.sortDir < 0 ? '多い' : '少ない'}順（${n.toLocaleString()}件${n > 80 ? 'の上から80件' : ''}）`;
+      head = T(st.sortDir < 0 ? 'sort_desc' : 'sort_asc', { what: q ? T('quoted', { q: esc(q) }) : T('all_items'), k: sortLab(), n: n.toLocaleString(), top: n > 80 ? T('top80') : '' });
     } else if (q) {
-      L = D.search(q, 80); head = L.length ? `${D.lastCount > L.length ? D.lastCount + '件中 ' + L.length + '件' : L.length + '件'}` : '見つかりません';
+      L = D.search(q, 80); head = L.length ? (D.lastCount > L.length ? T('n_of_m', { m: D.lastCount, n: L.length }) : T('n_items', { n: L.length })) : T('not_found');
     } else if (mode === 'pop') {
-      const tok = ++popReq; $('b-list').innerHTML = '<div class="b-lhead">読みこみ中…</div>';
+      const tok = ++popReq; $('b-list').innerHTML = '<div class="b-lhead">' + T('loading_s') + '</div>';
       let P; try { P = await DG.Chal.popular(); } catch (e) { P = null; }
       if (tok !== popReq || st.lmode !== 'pop' || $('b-q').value.trim()) return;
-      if (!P || !P.n) { $('b-list').innerHTML = '<div class="b-lhead">まだ挑戦状が少なくて、人気がわかりません。</div>'; return; }
+      if (!P || !P.n) { $('b-list').innerHTML = '<div class="b-lhead">' + T('pop_few') + '</div>'; return; }
       const row = P.tier[st.tab].length ? P.tier[st.tab] : P.all; cnt = new Map(row);
       L = row.map(([id]) => D.byId.get(id)).filter(Boolean);
-      head = `新しい挑戦状${P.n}枚で、${DG.TIER[st.tab]}によく使われている`;
+      head = T('pop_head', { n: P.n, t: DG.tierN(st.tab) });
     } else {
-      L = rec(st.tab); head = `${DG.TIER[st.tab]}向きの候補（さがすと24,838から選べる）<button class="btn sm" id="b-more" style="margin-left:6px">ほかの候補</button>`;
+      L = rec(st.tab); head = `${T('rec_head', { t: DG.tierN(st.tab) })}<button class="btn sm" id="b-more" style="margin-left:6px">${T('more_cands')}</button>`;
     }
     $('b-list').innerHTML = `<div class="b-lhead">${head}</div>` + L.map(e => {
       const h = DG.hint(e);
-      const side = mode === 'sort' ? `<span class="val">${SORTK.find(k => k[0] === String(st.sortK))[1]} ${st.sortK === 'pop' ? fmtPop(e.pop || 0) : e.st[+st.sortK]}</span>` : cnt ? `<span class="val">${cnt.get(e.id)}回</span>` : '';
-      return `<button class="it${e.id === cur ? ' on' : ''}" data-id="${esc(e.id)}"><span class="nm">${esc(e.n)}<small>${esc(e.pn || '')}${e.t ? ' ・' + esc(e.t.slice(0, 4)) + '年まで' : ''}</small></span>${side}<span class="tag h${h.t}">${h.txt}</span></button>`;
+      const side = mode === 'sort' ? `<span class="val">${sortLab()} ${st.sortK === 'pop' ? fmtPop(e.pop || 0) : e.st[+st.sortK]}</span>` : cnt ? `<span class="val">${T('n_times', { n: cnt.get(e.id) })}</span>` : '';
+      return `<button class="it${e.id === cur ? ' on' : ''}" data-id="${esc(e.id)}"><span class="nm">${esc(DG.dn(e))}<small>${esc((e.dpn != null ? e.dpn : e.pn) || '')}${e.t ? T('until_y', { y: esc(e.t.slice(0, 4)) }) : ''}</small></span>${side}<span class="tag h${h.t}">${h.txt}</span></button>`;
     }).join('');
     const mb = $('b-more'); if (mb) mb.onclick = () => { delete recCache[st.tab]; renderList(); };
   }
-  $('b-sk').innerHTML = SORTK.map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
-  $('b-fl').innerHTML = FILT.map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+  function selUI() {
+    $('b-sk').innerHTML = SORTK.map(([k, n]) => `<option value="${k}">${T(n)}</option>`).join(''); $('b-sk').value = String(st.sortK);
+    $('b-fl').innerHTML = FILT.map(([k, n]) => `<option value="${k}">${T(n)}</option>`).join(''); $('b-fl').value = st.filt;
+    $('b-dir').textContent = T(st.sortDir < 0 ? 'dir_desc' : 'dir_asc');
+  }
+  selUI();
   $('b-modes').addEventListener('click', ev => { const b = ev.target.closest('[data-m]'); if (!b) return; st.lmode = b.dataset.m; renderList(); });
   $('b-sk').onchange = () => { st.sortK = $('b-sk').value; renderList(); };
   $('b-fl').onchange = () => { st.filt = $('b-fl').value; renderList(); };
-  $('b-dir').onclick = () => { st.sortDir = -st.sortDir; $('b-dir').textContent = st.sortDir < 0 ? '多い順' : '少ない順'; renderList(); };
+  $('b-dir').onclick = () => { st.sortDir = -st.sortDir; $('b-dir').textContent = T(st.sortDir < 0 ? 'dir_desc' : 'dir_asc'); renderList(); };
   let qT = 0; $('b-q').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(renderList, 160); });
   $('b-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.target.blur(); renderList(); } });
   $('b-list').addEventListener('click', ev => {
@@ -230,8 +238,8 @@
     change(() => { st.spec[st.tab] = [id, 0, st.spec[st.tab][2]]; });
   });
   $('b-back').onclick = () => toTitle();
-  $('b-save').onclick = () => { if (DG.save({ name: DG.nameOf(st.spec), code: DG.encode(st.spec) })) toast('保存しました（この端末）'); else toast('保存できませんでした'); };
-  $('b-go').onclick = () => { st.vs[0] = st.spec.map(s => s.slice()); st.vsLab[0] = '作ったコマ'; if (!st.vs[1]) { st.vs[1] = null; } openVs(); };
+  $('b-save').onclick = () => { if (DG.save({ name: DG.nameOf(st.spec), code: DG.encode(st.spec) })) toast(T('saved_local')); else toast(T('save_fail')); };
+  $('b-go').onclick = () => { st.vs[0] = st.spec.map(s => s.slice()); st.vsLab[0] = () => T('lab_made'); if (!st.vs[1]) { st.vs[1] = null; } openVs(); };
   $('b-try').onclick = async () => { const opp = await DG.fix(DG.random()); st.trial = true; startMatch(st.spec.map(s => s.slice()), opp); };
   // ---------- 対戦の相手えらび ----------
   async function preview(cv, spec) {
@@ -241,50 +249,52 @@
     const g = cv.getContext('2d'); g.clearRect(0, 0, w, h);
     try { await DG.fix(spec); const t = new DG.Top(await DG.def(spec), 0); const k = Math.min(w, h) / 2 / (t.reach * 1.08); DG.drawTop(g, t, w / 2, h / 2, k, { tierCol: true }); } catch (e) { }
   }
-  function partsTxt(spec) { return spec.map((s, i) => DG.TIER[i][0] + '：' + esc(D.byId.get(s[0]).n)).join('　'); }
+  function partsTxt(spec) { return spec.map((s, i) => DG.tierS(i) + T('colon') + esc(DG.dn(D.byId.get(s[0])))).join(T('parts_sep')); }
+  // 「作ったコマ」などの札は、言語を切りかえても合うように関数でも持てる
+  const labOf = k => (typeof st.vsLab[k] === 'function' ? st.vsLab[k]() : st.vsLab[k]);
   function openVs() {
     stopMatch(); show('vs');
-    if (!st.vs[1]) { st.vs[1] = DG.random(); st.vsLab[1] = 'おまかせ'; }
+    if (!st.vs[1]) { st.vs[1] = DG.random(); st.vsLab[1] = () => T('random'); }
     for (const k of [0, 1]) {
       const el = $('v-s' + k), sp = st.vs[k];
       const lock = k === 1 && (st.chal || st.tmp);
-      el.innerHTML = `<span class="v-side">${k ? '青' : '赤'}${st.vsLab[k] ? '・' + esc(st.vsLab[k]) : ''}</span>` + (sp ? `<canvas class="v-cv"></canvas><div class="v-info"><div class="v-name">${esc(DG.nameOf(sp))}</div><div class="v-parts">${partsTxt(sp)}</div></div>` : '<div class="v-info"><div class="v-name">まだない</div></div>') +
-        (lock ? '' : `<div class="v-btns"><button class="btn sm" data-a="saved">保存から</button><button class="btn sm" data-a="rand">おまかせ</button>${k === 0 ? '<button class="btn sm" data-a="build">作る</button>' : ''}</div>`);
+      el.innerHTML = `<span class="v-side">${T(k ? 'blue' : 'red')}${labOf(k) ? T('dot') + esc(labOf(k)) : ''}</span>` + (sp ? `<canvas class="v-cv"></canvas><div class="v-info"><div class="v-name">${esc(DG.dispName(sp))}</div><div class="v-parts">${partsTxt(sp)}</div></div>` : `<div class="v-info"><div class="v-name">${T('none_yet')}</div></div>`) +
+        (lock ? '' : `<div class="v-btns"><button class="btn sm" data-a="saved">${T('from_saved')}</button><button class="btn sm" data-a="rand">${T('random')}</button>${k === 0 ? `<button class="btn sm" data-a="build">${T('make')}</button>` : ''}</div>`);
       if (sp) preview(el.querySelector('canvas'), sp);
       el.onclick = ev => {
         const b = ev.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
-        if (a === 'rand') { st.vs[k] = DG.random(); st.vsLab[k] = 'おまかせ'; openVs(); }
+        if (a === 'rand') { st.vs[k] = DG.random(); st.vsLab[k] = () => T('random'); openVs(); }
         else if (a === 'saved') openSaved(k);
         else if (a === 'build') openBuild(st.vs[0]);
       };
     }
     $('v-go').disabled = !(st.vs[0] && st.vs[1]);
-    $('v-title').textContent = st.chal ? '挑戦状と戦う' : st.tmp ? '仕返し' : '対戦';
+    $('v-title').textContent = T(st.chal ? 'btn_chal' : st.tmp ? 'revenge' : 'vs_title');
   }
   $('v-back').onclick = () => toTitle();
   $('v-go').onclick = () => { if (st.vs[0] && st.vs[1]) { st.trial = false; startMatch(st.vs[0], st.vs[1]); } };
   // ---------- 保存したコマ ----------
   function openSaved(pickFor) {
     st.pickFor = pickFor; stopMatch(); show('saved');
-    $('sv-title').textContent = pickFor >= 0 ? (pickFor ? '青' : '赤') + 'のコマをえらぶ' : '保存したコマ';
+    $('sv-title').textContent = pickFor >= 0 ? T('pick_top', { c: T(pickFor ? 'blue' : 'red') }) : T('btn_saved');
     const L = DG.saved().map(x => ({ x, sp: DG.decode(x.code) })).filter(y => y.sp);
-    $('sv-list').innerHTML = L.length ? L.map(({ x, sp }, i) => `<div class="sv" data-i="${i}"><canvas></canvas><div class="sv-i"><div class="v-name">${esc(DG.nameOf(sp))}</div><div class="v-parts">${partsTxt(sp)}</div><div class="v-btns">${pickFor >= 0 ? '<button class="btn sm hot" data-a="use">これにする</button>' : '<button class="btn sm hot" data-a="vs">戦う</button><button class="btn sm" data-a="edit">作り直す</button>'}<button class="btn sm" data-a="send">送る</button>${pickFor >= 0 ? '' : '<button class="btn sm" data-a="chal">挑戦状にする</button>'}<button class="btn sm" data-a="del">消す</button></div></div></div>`).join('') : '<div class="sv-empty">まだ保存したコマはありません。<br>「コマを作る」で作って「保存」をおしてください。</div>';
+    $('sv-list').innerHTML = L.length ? L.map(({ x, sp }, i) => `<div class="sv" data-i="${i}"><canvas></canvas><div class="sv-i"><div class="v-name">${esc(DG.dispName(sp))}</div><div class="v-parts">${partsTxt(sp)}</div><div class="v-btns">${pickFor >= 0 ? `<button class="btn sm hot" data-a="use">${T('use_this')}</button>` : `<button class="btn sm hot" data-a="vs">${T('fight')}</button><button class="btn sm" data-a="edit">${T('rebuild')}</button>`}<button class="btn sm" data-a="send">${T('send')}</button>${pickFor >= 0 ? '' : `<button class="btn sm" data-a="chal">${T('make_chal')}</button>`}<button class="btn sm" data-a="del">${T('del')}</button></div></div></div>`).join('') : `<div class="sv-empty">${T('sv_empty')}</div>`;
     $('sv-list').querySelectorAll('.sv').forEach(el => preview(el.querySelector('canvas'), L[+el.dataset.i].sp));
     $('sv-list').onclick = ev => {
       const b = ev.target.closest('[data-a]'); if (!b) return; const it = L[+b.closest('.sv').dataset.i], a = b.dataset.a;
-      if (a === 'use') { st.vs[pickFor] = it.sp; st.vsLab[pickFor] = '保存'; openVs(); }
-      else if (a === 'vs') { st.vs[0] = it.sp; st.vsLab[0] = '保存'; openVs(); }
+      if (a === 'use') { st.vs[pickFor] = it.sp; st.vsLab[pickFor] = () => T('lab_saved'); openVs(); }
+      else if (a === 'vs') { st.vs[0] = it.sp; st.vsLab[0] = () => T('lab_saved'); openVs(); }
       else if (a === 'edit') openBuild(it.sp);
       else if (a === 'send') send(it.sp);
-      else if (a === 'chal') DG.Chal.put([{ sp: it.sp, lab: 'このコマ' }]);
-      else if (a === 'del') { DG.unsave(it.x.code); openSaved(pickFor); toast('消しました'); }
+      else if (a === 'chal') DG.Chal.put([{ sp: it.sp, lab: T('lab_this') }]);
+      else if (a === 'del') { DG.unsave(it.x.code); openSaved(pickFor); toast(T('deleted')); }
     };
   }
   $('sv-back').onclick = () => st.pickFor >= 0 ? openVs() : toTitle();
   async function send(sp) {
-    const url = location.origin + location.pathname + '?t=' + encodeURIComponent(DG.encode(sp)), text = `弾丸合併「${DG.nameOf(sp)}」と戦って！`;
-    if (navigator.share) { try { await navigator.share({ title: '弾丸合併', text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
-    try { await navigator.clipboard.writeText(text + ' ' + url); toast('リンクをコピーしました'); } catch (e) { prompt('このリンクを送ってください', url); }
+    const url = location.origin + location.pathname + '?t=' + encodeURIComponent(DG.encode(sp)), text = T('send_text', { n: DG.dispName(sp) });
+    if (navigator.share) { try { await navigator.share({ title: T('doc_title'), text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(text + ' ' + url); toast(T('link_copied')); } catch (e) { prompt(T('send_link'), url); }
   }
   // ---------- 合体 → 試合 ----------
   let mergeT = [];
@@ -293,10 +303,10 @@
     stopMatch(); S.unlock();
     st.net = !!opt.net; st.who = opt.who || null; st.onEnd = opt.onEnd || null;
     await DG.fix(a); await DG.fix(b);
-    let da, db; try { [da, db] = [await DG.def(a), await DG.def(b)]; } catch (e) { toast('形を読みこめませんでした'); return; }
+    let da, db; try { [da, db] = [await DG.def(a), await DG.def(b)]; } catch (e) { toast(T('shape_err')); return; }
     st.match = { a, b };
     show('merge');
-    const side = (sp, k) => `<div class="mg-side s${k}">${st.who ? `<div class="mg-who">${esc(st.who[k])}</div>` : ''}${sp.map((s, i) => `<div class="mg-p" style="background:${DG.tierCol(i, k)}">${DG.TIER[i]}　${esc(D.byId.get(s[0]).n)}</div>`).join('')}<div class="mg-n">${esc(DG.nameOf(sp))}</div></div>`;
+    const side = (sp, k) => `<div class="mg-side s${k}">${st.who ? `<div class="mg-who">${esc(st.who[k])}</div>` : ''}${sp.map((s, i) => `<div class="mg-p" style="background:${DG.tierCol(i, k)}">${DG.tierN(i)}　${esc(DG.dn(D.byId.get(s[0])))}</div>`).join('')}<div class="mg-n">${esc(DG.dispName(sp))}</div></div>`;
     $('mg').innerHTML = side(a, 0) + '<div class="mg-vs">VS</div>' + side(b, 1);
     const ps = [...$('mg').querySelectorAll('.mg-side')];
     mergeT.forEach(clearTimeout); mergeT = [];
@@ -310,7 +320,7 @@
       for (const o of [st.m.A, st.m.B]) for (const L of o.layers) L.a0 = L.frags.reduce((x, f) => x + f.a, 0);
       show('battle'); if (is3) DG.V3.setMode('auto'); hudInit();
       fpsT = 0; fpsN = 0; fpsChecked = 0;
-      callout('回せ！'); S.beep(true); S.humStart(); st.run = true;
+      callout(T('co_spin')); S.beep(true); S.humStart(); st.run = true;
       $('hint3d').style.opacity = 1; setTimeout(() => { $('hint3d').style.opacity = 0; }, 3500);
     }, 2500));
   }
@@ -319,7 +329,7 @@
     const m = st.m;
     [m.A, m.B].forEach((o, k) => {
       const sp = k ? st.match.b : st.match.a;
-      $('h' + k).innerHTML = `<div class="nm">${st.who ? '<small>' + esc(st.who[k]) + '</small> ' : ''}${esc(DG.nameOf(sp))}</div><div class="hp"><u></u><i></i><span class="hpn">HP 100</span></div><div class="ly">${o.layers.map((L, i) => `<span><i style="background:${DG.tierCol(i, k)}"></i><em>${DG.TIER[i][0]}</em></span>`).join('')}</div>`;
+      $('h' + k).innerHTML = `<div class="nm">${st.who ? '<small>' + esc(st.who[k]) + '</small> ' : ''}${esc(DG.dispName(sp))}</div><div class="hp"><u></u><i></i><span class="hpn">HP 100</span></div><div class="ly">${o.layers.map((L, i) => `<span><i style="background:${DG.tierCol(i, k)}"></i><em>${DG.tierS(i)}</em></span>`).join('')}</div>`;
     });
   }
   function hud() {
@@ -350,31 +360,31 @@
   // ---------- 結果 ----------
   function result() {
     const m = st.m; if (!m) return; show('result'); S.win();
-    const sp = [st.match.a, st.match.b], nm = sp.map(DG.nameOf), O = [m.A, m.B];
+    const sp = [st.match.a, st.match.b], nm = sp.map(DG.dispName), O = [m.A, m.B];
     const w = m.winner;
     const pct = v => (v * 100).toFixed(0) + '%';
-    const best = (o, e) => o.best.a > 0 ? pct(o.best.a / e.area0) + (o.best.layer >= 0 ? '（' + DG.TIER[o.best.layer] + '）' : '') : '—';
+    const best = (o, e) => o.best.a > 0 ? pct(o.best.a / e.area0) + (o.best.layer >= 0 ? T('paren', { x: DG.tierN(o.best.layer) }) : '') : '—';
     const wob = o => Math.min(100, Math.round((o.wobSum / Math.max(1, o.wobN)) / 0.9 * 100));
     const rows = [
-      ['残り', o => pct(o.ratio())],
-      ['削った量', (o, e) => pct(o.dealt / e.area0)],
-      ['削られた量', o => pct(1 - o.ratio())],
-      ['最大の一撃', best],
-      ['暴れ度', wob],
-      ['合併解消', o => o.layers.filter(L => L.burst).map(L => DG.TIER[L.tier]).join('・') || 'なし'],
+      [T('r_left'), o => pct(o.ratio())],
+      [T('r_dealt'), (o, e) => pct(o.dealt / e.area0)],
+      [T('r_taken'), o => pct(1 - o.ratio())],
+      [T('r_best'), best],
+      [T('r_wob'), wob],
+      [T('r_burst'), o => o.layers.filter(L => L.burst).map(L => DG.tierN(L.tier)).join(T('list_sep')) || T('none')],
     ];
-    const why = w < 0 ? (m.mirror ? '同じコマどうしは引き分け' : '残りが同じ') : m.endBy === 'time' ? '60秒たって、残りが多かった' : '相手を65%削った';
-    $('res').innerHTML = `<h2>${w < 0 ? '引き分け' : `<span class="wn w${w}">${esc(nm[w])}</span>の勝ち！`}</h2><div class="why">${why}（${m.t.toFixed(1)}秒）</div>
+    const why = T(w < 0 ? (m.mirror ? 'why_mirror' : 'why_same') : m.endBy === 'time' ? 'why_time' : 'why_break');
+    $('res').innerHTML = `<h2>${w < 0 ? T('draw') : T('wins_html', { n: `<span class="wn w${w}">${esc(nm[w]).replace(/-/g, '-<wbr>')}</span>` })}</h2><div class="why">${T('why_t', { w: why, t: m.t.toFixed(1) })}</div>
       <table><tr><th></th><th class="c0">${esc(nm[0])}</th><th class="c1">${esc(nm[1])}</th></tr>${rows.map(([lab, f]) => `<tr><td>${lab}</td><td>${f(O[0], O[1])}</td><td>${f(O[1], O[0])}</td></tr>`).join('')}</table>
-      <button class="btn big gold img-btn" data-a="img">${w < 0 || (st.mode === 'net' && DG.room && w !== DG.room.slot) ? '結果画像を出す' : '勝利画像を出す'}</button>
+      <button class="btn big gold img-btn" data-a="img">${T(w < 0 || (st.mode === 'net' && DG.room && w !== DG.room.slot) ? 'img_result' : 'img_win')}</button>
       <p class="res-note" id="res-note">${esc(st.netNote || '')}</p>
       <div class="row">${btns()}</div>`;
     function btns() {
-      if (st.mode === 'watch') return '<button class="btn hot" data-a="leave">部屋を出る</button>';
-      if (st.mode === 'net') return '<button class="btn hot" data-a="netagain">もう一戦</button><button class="btn" data-a="leave">部屋を出る</button>';
-      if (st.trial) return '<button class="btn hot" data-a="back">作る画面にもどる</button><button class="btn" data-a="again">別の相手と試す</button><button class="btn" data-a="title">タイトル</button>';
-      if (st.chal) return '<button class="btn hot" data-a="rebuild">作り直して再挑戦</button><button class="btn" data-a="nextchal">別の挑戦状</button><button class="btn" data-a="title">タイトル</button>';
-      return '<button class="btn hot" data-a="rebuild">作り直す</button><button class="btn" data-a="opp">相手を変える</button><button class="btn" data-a="save">赤を保存</button>' + (st.tmp ? '' : '<button class="btn" data-a="putchal">挑戦状を置く</button>') + '<button class="btn" data-a="title">タイトル</button>';
+      if (st.mode === 'watch') return `<button class="btn hot" data-a="leave">${T('leave_room')}</button>`;
+      if (st.mode === 'net') return `<button class="btn hot" data-a="netagain">${T('one_more')}</button><button class="btn" data-a="leave">${T('leave_room')}</button>`;
+      if (st.trial) return `<button class="btn hot" data-a="back">${T('back_build')}</button><button class="btn" data-a="again">${T('try_other')}</button><button class="btn" data-a="title">${T('title_s')}</button>`;
+      if (st.chal) return `<button class="btn hot" data-a="rebuild">${T('rebuild_retry')}</button><button class="btn" data-a="nextchal">${T('other_chal')}</button><button class="btn" data-a="title">${T('title_s')}</button>`;
+      return `<button class="btn hot" data-a="rebuild">${T('rebuild')}</button><button class="btn" data-a="opp">${T('change_opp')}</button><button class="btn" data-a="save">${T('save_red')}</button>` + (st.tmp ? '' : `<button class="btn" data-a="putchal">${T('put_chal')}</button>`) + `<button class="btn" data-a="title">${T('title_s')}</button>`;
     }
     QM.syncNext();
     if (st.chal && st.mode === 'local') DG.Chal.onResult(w, sp[0]).then(t => { if (t && st.scr === 'result') $('res-note').textContent = t; });
@@ -383,11 +393,11 @@
       if (a === 'back') openBuild(st.spec);
       else if (a === 'again') { const opp = await DG.fix(DG.random()); startMatch(st.spec.map(s => s.slice()), opp); }
       else if (a === 'rebuild') openBuild(st.match.a);
-      else if (a === 'opp') { st.vs[1] = DG.random(); st.vsLab[1] = 'おまかせ'; st.tmp = false; openVs(); }
-      else if (a === 'save') { DG.save({ name: nm[0], code: DG.encode(sp[0]) }); toast('保存しました（この端末）'); }
-      else if (a === 'putchal') DG.Chal.put([{ sp: sp[0], lab: '赤' }, { sp: sp[1], lab: '青' }]);
+      else if (a === 'opp') { st.vs[1] = DG.random(); st.vsLab[1] = () => T('random'); st.tmp = false; openVs(); }
+      else if (a === 'save') { DG.save({ name: DG.nameOf(sp[0]), code: DG.encode(sp[0]) }); toast(T('saved_local')); }
+      else if (a === 'putchal') DG.Chal.put([{ sp: sp[0], lab: T('red') }, { sp: sp[1], lab: T('blue') }]);
       else if (a === 'nextchal') DG.Chal.open();
-      else if (a === 'netagain') { DG.Net.again(); b.disabled = true; b.textContent = 'あいてを待っています…'; }
+      else if (a === 'netagain') { DG.Net.again(); b.disabled = true; b.textContent = T('waiting'); }
       else if (a === 'leave') { DG.Net.leave(); toTitle(); }
       else if (a === 'title') toTitle();
       else if (a === 'img') openImage(b);
@@ -396,24 +406,24 @@
   // ---------- 結果画像と投稿 ----------
   const URL_GAME = 'https://nasubi-no-oniwa.github.io/dangan/';
   function shareText() {
-    const m = st.m, sp = [st.match.a, st.match.b], nm = sp.map(DG.nameOf), w = m.winner;
-    const tags = DG.resultTags(m, st.chal).filter(t => !/挑戦状$/.test(t.t)).map(t => t.t.replace(/！$/, ''));
-    let t = (tags.length ? '【' + tags.join('・') + '】' : '');
-    if (w < 0) t += `${nm[0]}と${nm[1]}は引き分け`;
-    else { const W_ = w ? m.B : m.A; t += `${nm[w]}が${nm[1 - w]}を破った！（HP${Math.ceil(Math.max(0, (W_.ratio() - DG.LOSE) / (1 - DG.LOSE)) * 100)}残し）`; }
-    if (st.chal) t += `\n${st.chal.n}さんの挑戦状に挑戦！あなたも→ ${DG.Chal.link(st.chal.id)}`;
-    else { const k = w < 0 ? sp[0] : sp[w]; t += `\nこのコマと戦う→ ${URL_GAME}?t=${encodeURIComponent(DG.encode(k))}`; }
-    return t + '\n#弾丸合併';
+    const m = st.m, sp = [st.match.a, st.match.b], nm = sp.map(DG.dispName), w = m.winner;
+    const tags = DG.resultTags(m, st.chal).filter(t => !t.ch).map(t => t.t.replace(/[！!]$/, ''));
+    let t = (tags.length ? T('sh_tags', { t: tags.join(T('list_sep')) }) : '');
+    if (w < 0) t += T('sh_draw', { a: nm[0], b: nm[1] });
+    else { const W_ = w ? m.B : m.A; t += T('sh_win', { w: nm[w], l: nm[1 - w], hp: Math.ceil(Math.max(0, (W_.ratio() - DG.LOSE) / (1 - DG.LOSE)) * 100) }); }
+    if (st.chal) t += T('sh_chal', { n: DG.who(st.chal.n), u: DG.Chal.link(st.chal.id) });
+    else { const k = w < 0 ? sp[0] : sp[w]; t += T('sh_fight', { u: `${URL_GAME}?t=${encodeURIComponent(DG.encode(k))}` }); }
+    return t + '\n' + T('hashtag');
   }
   async function openImage(btn) {
-    const cv = $('res-img'); btn.disabled = true; const t0 = btn.textContent; btn.textContent = '画像を作っています…';
+    const cv = $('res-img'); btn.disabled = true; const t0 = btn.textContent; btn.textContent = T('img_making');
     try {
       if (!st.snap) st.snap = DG.grabSnap(is3);
       if (!st.imgReady) { await DG.drawResultImage(cv, { m: st.m, snap: st.snap, spec: [st.match.a, st.match.b], chal: st.chal, url: URL_GAME }); st.imgReady = true; }
       const old = $('iv-img').src; if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
       $('iv-img').src = await new Promise(res => cv.toBlob(b => res(b ? URL.createObjectURL(b) : cv.toDataURL('image/png')), 'image/png'));
       $('imgview').classList.remove('hide');
-    } catch (e) { console.error(e); toast('画像を作れませんでした'); }
+    } catch (e) { console.error(e); toast(T('img_fail')); }
     btn.disabled = false; btn.textContent = t0;
   }
   function saveImg(blob) {
@@ -424,7 +434,7 @@
     const text = shareText(), blob = await new Promise(r => $('res-img').toBlob(r, 'image/png'));
     try { const file = new File([blob], 'dangan.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
     saveImg(blob); window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank');
-    toast('画像を保存しました。投稿画面に貼りつけてください');
+    toast(T('img_saved_paste'));
   };
   $('iv-save').onclick = () => saveImg();
   $('iv-close').onclick = () => $('imgview').classList.add('hide');
@@ -442,12 +452,27 @@
   Object.assign(DG, { show, toast, stopMatch, startMatch, toTitle, openVs, openBuild, preview, partsTxt, esc, curSpec });
   $('btn-build').onclick = () => { S.unlock(); openBuild(); };
   $('btn-online').onclick = () => { S.unlock(); DG.Net.open(); };
-  $('btn-vs').onclick = () => { S.unlock(); st.chal = null; st.tmp = false; if (!st.vs[0]) { let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? '作ったコマ' : 'おまかせ'; } openVs(); };
+  $('btn-vs').onclick = () => { S.unlock(); st.chal = null; st.tmp = false; if (!st.vs[0]) { let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? () => T('lab_made') : () => T('random'); } openVs(); };
   $('btn-saved').onclick = () => openSaved(-1);
   $('btn-howto').onclick = () => $('m-howto').classList.remove('hide');
   $('m-howto').addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target.id === 'm-howto') $('m-howto').classList.add('hide'); });
-  $('btn-snd').onclick = () => { S.unlock(); $('snd-name').textContent = S.toggle() ? 'あり' : 'なし'; };
-  $('snd-name').textContent = S.on ? 'あり' : 'なし';
+  $('btn-snd').onclick = () => { S.unlock(); $('snd-name').textContent = T(S.toggle() ? 'snd_on' : 'snd_off'); };
+  $('snd-name').textContent = T(S.on ? 'snd_on' : 'snd_off');
+  // ---------- ことばの切りかえ ----------
+  function relang() {
+    $('snd-name').textContent = T(S.on ? 'snd_on' : 'snd_off');
+    selUI();
+    if (!D.ready) $('loading').textContent = T(st.loadErr ? 'load_err' : 'loading');
+    $('c-dim').textContent = is3 ? '2D' : '3D';
+  }
+  // 地名の表示がかわったら（data.js が出す）、地名を出している画面を描きなおす
+  function relabel() {
+    if (st.scr === 'build') renderBuild(true);
+    else if (st.scr === 'vs') openVs();
+    else if (st.scr === 'saved') openSaved(st.pickFor);
+  }
+  document.addEventListener('langchange', relang);
+  document.addEventListener('namesrelabeled', relabel);
   // ダブルタップで拡大しないように
   let lastTap = 0; document.addEventListener('touchend', e => { const t = Date.now(); if (t - lastTap < 320 && !e.target.closest('input,button,a,canvas')) e.preventDefault(); lastTap = t; }, { passive: false });
   // ---------- はじめ ----------
@@ -459,18 +484,19 @@
     getDb: () => DG.getDb(), anchor: '#btn-online', anchorWhere: 'before', btnClass: 'btn big hot', nextClass: 'btn', nameKey: 'dangan_name',
     prep: () => { stopMatch(); },
     join: (code, name) => { S.unlock(); DG.Net.join(name, code); },
-    cpu: () => DG.Chal.open(true), cpuLabel: '挑戦状と戦いながら待つ',
+    cpu: () => DG.Chal.open(true), cpuLabel: () => T('cpu_wait_chal'),
     quit: () => { if (DG.Net) DG.Net.leave(); toTitle(); },
     colors: { main: 'var(--red)', alt: 'var(--blue)', bg: '#f6eedb', fg: '#2a211b' },
   });
   QM.resultSlot('#res-qm', null);
+  $('loading').textContent = T('loading');
   D.load().then(async () => {
     $('loading').textContent = '';
     DG.Chal.mineSummary(true);
     if (await DG.Chal.fromLink()) return;
     document.querySelectorAll('#s-title .btn').forEach(b => b.disabled = false);
     const q = new URLSearchParams(location.search), t = q.get('t');
-    if (t) { const sp = DG.decode(t); if (sp) { st.vs[1] = sp; st.vsLab[1] = 'もらったコマ'; let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? '作ったコマ' : 'おまかせ'; history.replaceState(null, '', location.pathname); openVs(); toast('もらったコマと戦えます'); return; } }
+    if (t) { const sp = DG.decode(t); if (sp) { st.vs[1] = sp; st.vsLab[1] = () => T('lab_recv'); let c = null; try { c = DG.decode(localStorage.getItem('dangan_cur')); } catch (e) { } st.vs[0] = c || DG.random(); st.vsLab[0] = c ? () => T('lab_made') : () => T('random'); history.replaceState(null, '', location.pathname); openVs(); toast(T('recv_toast')); return; } }
     demo();
-  }).catch(e => { console.error(e); $('loading').textContent = '読みこめませんでした。通信を確かめて、ページを読みこみなおしてください。'; });
+  }).catch(e => { console.error(e); $('loading').textContent = T('load_err'); st.loadErr = true; });
 })();

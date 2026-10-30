@@ -287,3 +287,26 @@ body.slow #s-battle::after { content: ''; position: absolute; inset: 0; pointer-
 .iv { padding: 12px; text-align: center; max-width: min(940px, 100%); }
 .iv img { display: block; margin: 0 auto; width: auto; max-width: 100%; height: auto; max-height: calc(100vh - 150px); object-fit: contain; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.35); -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto; }
 .iv .note { margin: 6px 0 0; }
+
+/* ことばの切りかえ（タイトルは暗い背景なので明るい色） */
+.langs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+.langs button{font:800 13px 'M PLUS Rounded 1c',sans-serif;background:rgba(23,17,13,.45);color:#f3ead6;border:2px solid rgba(243,234,214,.55);border-radius:999px;padding:4px 12px;cursor:pointer}
+.langs button[aria-pressed="true"]{background:var(--gold);color:var(--sumi);border-color:var(--gold)}
+/* 韓国語：Dela Gothic One にハングルがないので Black Han Sans */
+html[data-lang="ko"] .logo,html[data-lang="ko"] .b-name,html[data-lang="ko"] .mg-n,html[data-lang="ko"] .callout,html[data-lang="ko"] .res h2,html[data-lang="ko"] .modal h2,html[data-lang="ko"] .on-card h2,html[data-lang="ko"] .p-head h2,html[data-lang="ko"] .bz-rank,html[data-lang="ko"] .clock{font-family:'Black Han Sans','Dela Gothic One',sans-serif;font-weight:400}
+/* 英語の題字：横に長いので小さめ・字間をつめる */
+html[data-lang="en"] .logo .l1{letter-spacing:.18em;padding-left:.18em;font-size:clamp(28px,min(8.5vw,8.5vh),52px)}
+html[data-lang="en"] .logo .l2{font-size:clamp(46px,min(14.5vw,14.5vh),90px);letter-spacing:0}
+html[data-lang="ko"] .logo .l2{letter-spacing:.08em}
+/* 外国語の合併名は長いので、つなぎ目（-）や語の切れ目で折り返す */
+html:not([data-lang="ja"]) .res h2,html:not([data-lang="ja"]) .mg-n{word-break:normal;overflow-wrap:anywhere}
+html:not([data-lang="ja"]) .v-name{white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+html[data-lang="en"] .v-name{font-size:15px}
+html[data-lang="en"] .b-name{font-size:16px}
+html:not([data-lang="ja"]) .fld input{min-width:0}
+html[data-lang="en"] .bz-rank{font-size:13px}
+html[data-lang="zh"] .logo{font-family:'Noto Sans TC','Dela Gothic One',sans-serif;font-weight:900;font-synthesis:none}
+html:not([data-lang="ja"]) .res h2 .wn,html:not([data-lang="ja"]) .mg-n,html:not([data-lang="ja"]) .res h2{word-break:normal;overflow-wrap:break-word}
+html[data-lang="ko"] .res h2 .wn,html[data-lang="ko"] .mg-n{word-break:keep-all}
+html:not([data-lang="ja"]) #res h2,html:not([data-lang="ja"]) #res .wn{word-break:normal!important;overflow-wrap:break-word}
+html[data-lang="ko"] #res .wn{word-break:keep-all!important}

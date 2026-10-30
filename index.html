@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 <canvas id="arena3"></canvas>
@@ -42,25 +42,26 @@
 <!-- タイトル -->
 <section class="screen active" id="s-title">
   <div class="t-wrap">
-    <div class="logo"><span class="l1">弾丸</span><span class="l2">合併</span></div>
-    <p class="sub">市町村や国を<b>3つ</b>、1本の軸で<b>串ざし</b>。<br>はみ出した<b>本物の形</b>がぶつかって削れ合う。</p>
+    <div class="logo" data-ih="logo"><span class="l1">弾丸</span><span class="l2">合併</span></div>
+    <p class="sub" data-ih="tagline">市町村や国を<b>3つ</b>、1本の軸で<b>串ざし</b>。<br>はみ出した<b>本物の形</b>がぶつかって削れ合う。</p>
     <div class="t-btns">
-      <button class="btn big gold" id="btn-build">コマを作る</button>
-      <button class="btn big blue" id="btn-online">あいことば対戦</button>
+      <button class="btn big gold" id="btn-build" data-i="btn_build">コマを作る</button>
+      <button class="btn big blue" id="btn-online" data-i="btn_online">あいことば対戦</button>
       <div class="row t-row2">
-        <button class="btn sm2" id="btn-vs">ひとりで対戦</button>
-        <button class="btn sm2" id="btn-chal">挑戦状と戦う</button>
-        <button class="btn sm2" id="btn-saved">保存したコマ</button>
+        <button class="btn sm2" id="btn-vs" data-i="btn_vs">ひとりで対戦</button>
+        <button class="btn sm2" id="btn-chal" data-i="btn_chal">挑戦状と戦う</button>
+        <button class="btn sm2" id="btn-saved" data-i="btn_saved">保存したコマ</button>
       </div>
       <div class="row t-row2">
-        <button class="btn sm2" id="btn-mine">あなたの挑戦状</button>
-        <button class="btn sm2" id="btn-bz">番付</button>
-        <button class="btn sm2" id="btn-howto">あそびかた</button>
-        <button class="btn sm2" id="btn-snd">音：<span id="snd-name">あり</span></button>
+        <button class="btn sm2" id="btn-mine" data-i="btn_mine">あなたの挑戦状</button>
+        <button class="btn sm2" id="btn-bz" data-i="btn_bz">番付</button>
+        <button class="btn sm2" id="btn-howto" data-i="howto">あそびかた</button>
+        <button class="btn sm2" id="btn-snd"><span data-i="snd">音：</span><span id="snd-name">あり</span></button>
       </div>
       <p class="chal-mine" id="chal-mine"></p>
       <button class="news" id="chal-news" hidden></button>
-      <a class="jimoto" href="../jimoto/">地元の最強で、形どうしを戦わせる →</a>
+      <a class="jimoto" href="../jimoto/" data-i="jimoto_link">地元の最強で、形どうしを戦わせる →</a>
+      <div class="langs" role="group" aria-label="Language"><button type="button" data-lang="ja">日本語</button><button type="button" data-lang="en">English</button><button type="button" data-lang="zh">繁中</button><button type="button" data-lang="ko">한국어</button></div>
     </div>
     <p class="loading" id="loading">市町村を読みこみ中…</p>
   </div>
@@ -69,9 +70,9 @@
 <!-- 作る -->
 <section class="screen" id="s-build">
   <header class="bar">
-    <button class="btn sm ghost" id="b-back">← もどる</button>
+    <button class="btn sm ghost" id="b-back" data-i="back_arrow">← もどる</button>
     <div class="b-name" id="b-name">…</div>
-    <button class="btn sm" id="b-random">おまかせ合併</button>
+    <button class="btn sm" id="b-random" data-i="auto_merge">おまかせ合併</button>
   </header>
   <div class="b-main">
     <div class="b-top">
@@ -87,33 +88,33 @@
             <div class="b-cname" id="b-cname"></div>
             <div class="b-meta" id="b-meta"></div>
             <div class="b-rot">
-              <button class="btn sm" id="b-rl" aria-label="左に45度">⟲</button>
+              <button class="btn sm" id="b-rl" aria-label="左に45度" data-ia="rot_l">⟲</button>
               <span id="b-ang">0°</span>
-              <button class="btn sm" id="b-rr" aria-label="右に45度">⟳</button>
+              <button class="btn sm" id="b-rr" aria-label="右に45度" data-ia="rot_r">⟳</button>
             </div>
-            <div class="b-tip">形の上の<b>●</b>をおして、軸をさす所をえらぶ</div>
+            <div class="b-tip" data-ih="b_tip">形の上の<b>●</b>をおして、軸をさす所をえらぶ</div>
           </div>
         </div>
         <div class="b-search">
-          <input id="b-q" type="search" placeholder="市町村・国をさがす（例：大垣市、チリ）" autocomplete="off" enterkeyhint="search">
-          <div class="b-modes" id="b-modes"><button class="seg on" data-m="rec">おすすめ</button><button class="seg" data-m="pop">人気</button><button class="seg" data-m="sort">並べかえ</button></div>
-          <div class="b-sort hide" id="b-sort"><select id="b-sk" aria-label="並べる数字"></select><button class="btn sm" id="b-dir">多い順</button><select id="b-fl" aria-label="しぼりこみ"></select></div>
+          <input id="b-q" type="search" placeholder="市町村・国をさがす（例：大垣市、チリ）" data-ip="ph_search" autocomplete="off" enterkeyhint="search">
+          <div class="b-modes" id="b-modes"><button class="seg on" data-m="rec" data-i="m_rec">おすすめ</button><button class="seg" data-m="pop" data-i="m_pop">人気</button><button class="seg" data-m="sort" data-i="m_sort">並べかえ</button></div>
+          <div class="b-sort hide" id="b-sort"><select id="b-sk" aria-label="並べる数字" data-ia="sort_key"></select><button class="btn sm" id="b-dir">多い順</button><select id="b-fl" aria-label="しぼりこみ" data-ia="filter"></select></div>
         </div>
         <div class="b-list" id="b-list"></div>
       </div>
     </div>
   </div>
   <footer class="bar bottom">
-    <button class="btn" id="b-try">試し回し</button>
-    <button class="btn" id="b-save">保存</button>
-    <button class="btn hot" id="b-go">これで戦う</button>
+    <button class="btn" id="b-try" data-i="try_spin">試し回し</button>
+    <button class="btn" id="b-save" data-i="save">保存</button>
+    <button class="btn hot" id="b-go" data-i="fight_this">これで戦う</button>
   </footer>
 </section>
 
 <!-- 対戦の相手えらび -->
 <section class="screen" id="s-vs">
   <header class="bar">
-    <button class="btn sm ghost" id="v-back">← もどる</button>
+    <button class="btn sm ghost" id="v-back" data-i="back_arrow">← もどる</button>
     <div class="v-title" id="v-title">対戦</div>
   </header>
   <div class="v-slots">
@@ -121,13 +122,13 @@
     <div class="v-mid">VS</div>
     <div class="v-slot" id="v-s1"></div>
   </div>
-  <footer class="bar bottom"><button class="btn big hot" id="v-go">対戦！</button></footer>
+  <footer class="bar bottom"><button class="btn big hot" id="v-go" data-i="vs_go">対戦！</button></footer>
 </section>
 
 <!-- 保存したコマ -->
 <section class="screen" id="s-saved">
   <header class="bar">
-    <button class="btn sm ghost" id="sv-back">← もどる</button>
+    <button class="btn sm ghost" id="sv-back" data-i="back_arrow">← もどる</button>
     <div class="v-title" id="sv-title">保存したコマ</div>
   </header>
   <div class="sv-list" id="sv-list"></div>
@@ -144,14 +145,14 @@
     <div class="pl p1" id="h1"></div>
   </div>
   <div class="callout" id="callout"></div>
-  <div class="spd" id="spd"><span>速さ</span><button class="btn sm ghost" data-s="1">×1</button><button class="btn sm ghost" data-s="0.5">×0.5</button><button class="btn sm ghost" data-s="0.25">×0.25</button><button class="btn sm ghost" data-s="0.1">×0.1</button></div>
+  <div class="spd" id="spd"><span data-i="speed">速さ</span><button class="btn sm ghost" data-s="1">×1</button><button class="btn sm ghost" data-s="0.5">×0.5</button><button class="btn sm ghost" data-s="0.25">×0.25</button><button class="btn sm ghost" data-s="0.1">×0.1</button></div>
   <div class="cam">
-    <button class="btn sm ghost" id="c-auto">おまかせ視点</button>
-    <button class="btn sm ghost" id="c-top">真上</button>
+    <button class="btn sm ghost" id="c-auto" data-i="cam_auto">おまかせ視点</button>
+    <button class="btn sm ghost" id="c-top" data-i="cam_top">真上</button>
     <button class="btn sm ghost" id="c-dim">2D</button>
   </div>
-  <button class="btn sm ghost quit" id="c-quit">やめる</button>
-  <div class="hint3d" id="hint3d">ドラッグで回す・ピンチで寄る</div>
+  <button class="btn sm ghost quit" id="c-quit" data-i="quit">やめる</button>
+  <div class="hint3d" id="hint3d" data-i="hint3d">ドラッグで回す・ピンチで寄る</div>
 </section>
 
 <!-- 結果 -->
@@ -162,23 +163,23 @@
 <!-- あいことば対戦 -->
 <section class="screen" id="s-online">
   <div class="card on-card">
-    <h2>あいことば対戦</h2>
+    <h2 data-i="btn_online">あいことば対戦</h2>
     <div id="on-form">
-      <p class="note">同じ「あいことば」を入れた人と1対1。保存したコマから30秒以内に1つえらんで、同時に公開します。3人目からは観戦です。</p>
-      <label class="fld">なまえ<input id="in-name" maxlength="8" placeholder="8文字まで" autocomplete="off"></label>
-      <label class="fld">あいことば<input id="in-code" maxlength="20" placeholder="例：だんがんたいけつ" autocomplete="off"></label>
-      <button class="btn hot wide" id="btn-join">入る</button>
+      <p class="note" data-i="on_note">同じ「あいことば」を入れた人と1対1。保存したコマから30秒以内に1つえらんで、同時に公開します。3人目からは観戦です。</p>
+      <label class="fld"><span data-i="name">なまえ</span><input id="in-name" maxlength="8" placeholder="8文字まで" data-ip="ph_name8" autocomplete="off"></label>
+      <label class="fld"><span data-i="passcode">あいことば</span><input id="in-code" maxlength="20" placeholder="例：だんがんたいけつ" data-ip="ex_code" autocomplete="off"></label>
+      <button class="btn hot wide" id="btn-join" data-i="join_in">入る</button>
     </div>
     <div id="on-wait" class="hide"><p class="big-note" id="on-msg">あいてを待っています…</p><p class="note" id="on-people"></p></div>
     <p class="err" id="on-err"></p>
-    <button class="btn sm ghost dark" id="btn-on-back">もどる</button>
+    <button class="btn sm ghost dark" id="btn-on-back" data-i="back">もどる</button>
   </div>
 </section>
 
 <!-- オンライン：コマをえらぶ（30秒） -->
 <section class="screen" id="s-pick">
   <header class="bar">
-    <button class="btn sm ghost" id="pk-back">← 出る</button>
+    <button class="btn sm ghost" id="pk-back" data-i="leave_arrow">← 出る</button>
     <div class="v-title pk-title" id="pk-title"></div>
     <div class="pk-time" id="pk-time"></div>
   </header>
@@ -190,11 +191,11 @@
 <!-- あなたの挑戦状 -->
 <section class="screen" id="s-mine">
   <div class="panel">
-    <div class="p-head"><button class="btn sm ghost" id="btn-mine-back">← もどる</button><h2>あなたの挑戦状</h2></div>
+    <div class="p-head"><button class="btn sm ghost" id="btn-mine-back" data-i="back_arrow">← もどる</button><h2 data-i="btn_mine">あなたの挑戦状</h2></div>
     <div class="p-body">
       <div id="mine-list"></div>
-      <div class="xf"><h3>ほかの端末に引き継ぐ</h3><p class="note">機種変更のときは、コードを出して新しい端末で入れてください。</p>
-        <div class="row"><button class="btn sm" id="btn-xf-out">コードを出す</button><button class="btn sm" id="btn-xf-in">コードを入れる</button></div></div>
+      <div class="xf"><h3 data-i="xf_h">ほかの端末に引き継ぐ</h3><p class="note" data-i="xf_note">機種変更のときは、コードを出して新しい端末で入れてください。</p>
+        <div class="row"><button class="btn sm" id="btn-xf-out" data-i="xf_out">コードを出す</button><button class="btn sm" id="btn-xf-in" data-i="xf_in">コードを入れる</button></div></div>
     </div>
   </div>
 </section>
@@ -202,9 +203,9 @@
 <!-- 番付 -->
 <section class="screen" id="s-bz">
   <div class="panel">
-    <div class="p-head"><button class="btn sm ghost" id="btn-bz-back">← もどる</button><h2>番付</h2><select class="cls" id="bz-reg" aria-label="県・国"></select></div>
+    <div class="p-head"><button class="btn sm ghost" id="btn-bz-back" data-i="back_arrow">← もどる</button><h2 data-i="btn_bz">番付</h2><select class="cls" id="bz-reg" aria-label="県・国" data-ia="bz_reg"></select></div>
     <div class="p-body">
-      <p class="note bz-note">中段の県・国ごとに、この30日で挑戦者を多く倒した挑戦状。勝ちは試合を計算しなおして確かめています。</p>
+      <p class="note bz-note" data-i="bz_note">中段の県・国ごとに、この30日で挑戦者を多く倒した挑戦状。勝ちは試合を計算しなおして確かめています。</p>
       <p class="bz-st" id="bz-st"></p>
       <div id="bz-list"></div>
     </div>
@@ -213,25 +214,25 @@
 
 <!-- あそびかた -->
 <div class="modal hide" id="m-howto"><div class="card">
-  <h2>あそびかた</h2>
-  <p>① <b>上段・中段・下段</b>に、市町村や国を1つずつえらぶ。中段がいちばん大きくなる。</p>
-  <p>② それぞれの形の<b>どこに軸をさすか</b>（●）と、<b>向き</b>（45°ずつ）を決める。</p>
-  <p>③ あとは全自動。<b>外にはみ出した所</b>が当たって削れていく。</p>
-  <p>・形を<b>65%削られるとHPが0になって負け</b>。60秒たったらHPの多い方の勝ち。</p>
-  <p>・削れるほど軽くなって<b>速くなる</b>。重心からずれた所にさすと<b>暴れる</b>。</p>
-  <p>・軸のまわりまで削れた段は<b>合併解消</b>（その段ごと外れる）。</p>
-  <p>・上段はとがり・強さ、中段は体力・守り、下段は速さがききやすい。</p>
-  <p>・<b>だれかと対戦</b>・<b>あいことば対戦</b>：保存したコマから30秒以内にえらんで勝負。</p>
-  <p>・<b>挑戦状</b>：試合のあとや「保存したコマ」から置ける。だれかが挑むと成績がつく。破られたら<b>仕返し</b>も。</p>
-  <p>・<b>番付</b>：中段の県・国ごとに、この30日で挑戦者を多く倒した挑戦状が並ぶ。</p>
-  <div class="row"><button class="btn hot" data-close>わかった</button></div>
+  <h2 data-i="howto">あそびかた</h2>
+  <p data-ih="h1">① <b>上段・中段・下段</b>に、市町村や国を1つずつえらぶ。中段がいちばん大きくなる。</p>
+  <p data-ih="h2">② それぞれの形の<b>どこに軸をさすか</b>（●）と、<b>向き</b>（45°ずつ）を決める。</p>
+  <p data-ih="h3">③ あとは全自動。<b>外にはみ出した所</b>が当たって削れていく。</p>
+  <p data-ih="h4">・形を<b>65%削られるとHPが0になって負け</b>。60秒たったらHPの多い方の勝ち。</p>
+  <p data-ih="h5">・削れるほど軽くなって<b>速くなる</b>。重心からずれた所にさすと<b>暴れる</b>。</p>
+  <p data-ih="h6">・軸のまわりまで削れた段は<b>合併解消</b>（その段ごと外れる）。</p>
+  <p data-ih="h7">・上段はとがり・強さ、中段は体力・守り、下段は速さがききやすい。</p>
+  <p data-ih="h8">・<b>だれかと対戦</b>・<b>あいことば対戦</b>：保存したコマから30秒以内にえらんで勝負。</p>
+  <p data-ih="h9">・<b>挑戦状</b>：試合のあとや「保存したコマ」から置ける。だれかが挑むと成績がつく。破られたら<b>仕返し</b>も。</p>
+  <p data-ih="h10">・<b>番付</b>：中段の県・国ごとに、この30日で挑戦者を多く倒した挑戦状が並ぶ。</p>
+  <div class="row"><button class="btn hot" data-close data-i="got_it">わかった</button></div>
 </div></div>
 
 <!-- 結果画像 -->
 <div class="modal hide" id="imgview"><div class="card iv">
-  <img id="iv-img" alt="結果画像">
-  <div class="row"><button class="btn hot" id="iv-share">Xに投稿</button><button class="btn" id="iv-save">画像を保存</button><button class="btn" id="iv-close">とじる</button></div>
-  <p class="note">画像を長押しでも保存できます</p>
+  <img id="iv-img" alt="結果画像" data-ia="res_img">
+  <div class="row"><button class="btn hot" id="iv-share" data-i="post_x">Xに投稿</button><button class="btn" id="iv-save" data-i="save_img">画像を保存</button><button class="btn" id="iv-close" data-i="close">とじる</button></div>
+  <p class="note" data-i="long_press">画像を長押しでも保存できます</p>
 </div></div>
 <canvas id="res-img" width="1200" height="675" hidden></canvas>
 
@@ -240,18 +241,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
-<script src="js/data.js?v=6"></script>
-<script src="js/geo.js?v=6"></script>
-<script src="js/sim.js?v=6"></script>
-<script src="js/top.js?v=6"></script>
-<script src="js/view3d.js?v=6"></script>
-<script src="js/view2d.js?v=6"></script>
-<script src="js/resimg.js?v=6"></script>
-<script src="js/sound.js?v=6"></script>
-<script src="js/firebase-config.js?v=6"></script>
-<script src="js/qm.js?v=6"></script>
-<script src="js/online.js?v=6"></script>
-<script src="js/chal.js?v=6"></script>
-<script src="js/main.js?v=6"></script>
+<script src="js/i18n.js?v=7"></script>
+<script src="js/data.js?v=7"></script>
+<script src="js/geo.js?v=7"></script>
+<script src="js/sim.js?v=7"></script>
+<script src="js/top.js?v=7"></script>
+<script src="js/view3d.js?v=7"></script>
+<script src="js/view2d.js?v=7"></script>
+<script src="js/resimg.js?v=7"></script>
+<script src="js/sound.js?v=7"></script>
+<script src="js/firebase-config.js?v=7"></script>
+<script src="js/qm.js?v=7"></script>
+<script src="js/online.js?v=7"></script>
+<script src="js/chal.js?v=7"></script>
+<script src="js/main.js?v=7"></script>
 </body>
 </html>
