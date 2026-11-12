@@ -13,6 +13,13 @@
 //   dg_xfer/{コード} : { v: 'id:合いかぎ,…', t }（引き継ぎ）
 //   ※管理人が Firebase の画面で dg_chal/{id}/x = true をつけると、その挑戦状はどこにも出なくなる
 // =============================================
+
+// Xの投稿で引用するツイート（なすびのお庭の管理ページ quote/ で日本語・英語を貼りかえられる）
+var NQ=window.__nq||(window.__nq={q:{}});if(!NQ.f){NQ.f=1;fetch('https://ft-red-default-rtdb.asia-southeast1.firebasedatabase.app/xquote/g/dangan.json').then(r=>r.json()).then(d=>{if(d&&typeof d==='object')NQ.q=d;}).catch(()=>{});}
+function quoteURL(){let l='';try{if(typeof lang==='string')l=lang;}catch(e){}if(!l)l=document.documentElement.lang||'ja';const u=(l.slice(0,2)==='ja'?NQ.q.ja:NQ.q.en)||'';return /^https:\/\/x\.com\/[A-Za-z0-9_]{1,15}\/status\/\d{5,25}$/.test(u)?u:'';}
+function xIntent(text,url){const q=quoteURL();return 'https://x.com/intent/post?text='+encodeURIComponent(q?text+'\n'+url:text)+'&url='+encodeURIComponent(q||url);}
+function xIntentT(text){const q=quoteURL();return 'https://x.com/intent/post?text='+encodeURIComponent(text)+(q?'&url='+encodeURIComponent(q):'');}
+function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.text=(o.text||'')+(o.url?'\n'+o.url:'')+'\n'+q;delete o.url;return o;}
 (function () {
   const DG = window.DG, JM = window.JM, D = JM.D;
   const T = (k, v) => I18N.t(k, v);
@@ -156,8 +163,8 @@
   };
   // ---------- 投稿・リンク ----------
   C.shareText = async function (text) {
-    try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
-    window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank');
+    try { if (navigator.share) { await navigator.share(nqS({ text })); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    window.open(xIntentT(text), '_blank');
   };
   async function copy(t) {
     try { await navigator.clipboard.writeText(t); DG.toast(T('copied')); }

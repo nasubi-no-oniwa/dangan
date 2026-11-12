@@ -1,6 +1,13 @@
 // =============================================
 //  弾丸合併  画面と流れ
 // =============================================
+
+// Xの投稿で引用するツイート（なすびのお庭の管理ページ quote/ で日本語・英語を貼りかえられる）
+var NQ=window.__nq||(window.__nq={q:{}});if(!NQ.f){NQ.f=1;fetch('https://ft-red-default-rtdb.asia-southeast1.firebasedatabase.app/xquote/g/dangan.json').then(r=>r.json()).then(d=>{if(d&&typeof d==='object')NQ.q=d;}).catch(()=>{});}
+function quoteURL(){let l='';try{if(typeof lang==='string')l=lang;}catch(e){}if(!l)l=document.documentElement.lang||'ja';const u=(l.slice(0,2)==='ja'?NQ.q.ja:NQ.q.en)||'';return /^https:\/\/x\.com\/[A-Za-z0-9_]{1,15}\/status\/\d{5,25}$/.test(u)?u:'';}
+function xIntent(text,url){const q=quoteURL();return 'https://x.com/intent/post?text='+encodeURIComponent(q?text+'\n'+url:text)+'&url='+encodeURIComponent(q||url);}
+function xIntentT(text){const q=quoteURL();return 'https://x.com/intent/post?text='+encodeURIComponent(text)+(q?'&url='+encodeURIComponent(q):'');}
+function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.text=(o.text||'')+(o.url?'\n'+o.url:'')+'\n'+q;delete o.url;return o;}
 (function () {
   const DG = window.DG, D = JM.D, S = DG.S;
   const T = (k, v) => I18N.t(k, v);
@@ -293,7 +300,7 @@
   $('sv-back').onclick = () => st.pickFor >= 0 ? openVs() : toTitle();
   async function send(sp) {
     const url = location.origin + location.pathname + '?t=' + encodeURIComponent(DG.encode(sp)), text = T('send_text', { n: DG.dispName(sp) });
-    if (navigator.share) { try { await navigator.share({ title: T('doc_title'), text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    if (navigator.share) { try { await navigator.share(nqS({ title: T('doc_title'), text, url })); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
     try { await navigator.clipboard.writeText(text + ' ' + url); toast(T('link_copied')); } catch (e) { prompt(T('send_link'), url); }
   }
   // ---------- 合体 → 試合 ----------
@@ -432,8 +439,8 @@
   }
   $('iv-share').onclick = async () => {
     const text = shareText(), blob = await new Promise(r => $('res-img').toBlob(r, 'image/png'));
-    try { const file = new File([blob], 'dangan.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
-    saveImg(blob); window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text), '_blank');
+    try { const file = new File([blob], 'dangan.png', { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share(nqS({ files: [file], text })); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    saveImg(blob); window.open(xIntentT(text), '_blank');
     toast(T('img_saved_paste'));
   };
   $('iv-save').onclick = () => saveImg();
